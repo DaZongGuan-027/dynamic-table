@@ -9,7 +9,9 @@
     row-key="id"
     :show-selection="true"
     :show-index="true"
+    :row-actions="actions"
     @selection-change="handleSelectionChange"
+    @row-action="handleRowAction"
   >
     <template #toolbar-left>
       <el-button type="primary" icon="el-icon-plus" size="small">新增</el-button>
@@ -27,12 +29,6 @@
         {{ row.role === 'admin' ? '管理员' : '普通用户' }}
       </el-tag>
     </template>
-
-    <template #row-actions="{ row }">
-      <el-button type="text" size="mini" @click="handleView(row)">查看</el-button>
-      <el-button type="text" size="mini" @click="handleEdit(row)">编辑</el-button>
-      <el-button type="text" size="mini" style="color: #f56c6c" @click="handleDelete(row)">删除</el-button>
-    </template>
   </dynamic-table>
 </template>
 
@@ -49,6 +45,11 @@ export default {
     return {
       userId: 'U10001',
       selectedRows: [],
+      actions: [
+        { label: '查看', action: 'view' },
+        { label: '编辑', action: 'edit' },
+        { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
+      ],
 
       fieldMetaList: [
         { fieldKey: 'username', fieldLabel: '用户名', fieldType: 'string', filterable: true, sortable: true, width: 120, align: 'left' },
@@ -81,18 +82,16 @@ export default {
       this.selectedRows = selection
     },
 
-    handleView(row) {
-      this.$message.info('查看: ' + row.username)
-    },
-
-    handleEdit(row) {
-      this.$message.info('编辑: ' + row.username)
-    },
-
-    handleDelete(row) {
-      this.$confirm('确认删除用户 ' + row.username + '？', '提示', { type: 'warning' })
-        .then(() => { this.$message.success('已删除') })
-        .catch(() => {})
+    handleRowAction({ action, row }) {
+      if (action === 'view') {
+        this.$message.info('查看: ' + row.username)
+      } else if (action === 'edit') {
+        this.$message.info('编辑: ' + row.username)
+      } else if (action === 'delete') {
+        this.$confirm('确认删除用户 ' + row.username + '？', '提示', { type: 'warning' })
+          .then(() => { this.$message.success('已删除') })
+          .catch(() => {})
+      }
     }
   }
 }

@@ -33,19 +33,8 @@
       </div>
 
       <div v-if="showSearch" class="search-area" @click.stop>
-        <el-input
-          v-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType"
-          ref="searchInput"
-          v-model="searchValue"
-          size="mini"
-          :placeholder="'输入' + fieldMeta.fieldLabel"
-          clearable
-          @keyup.enter.native="handleSearchConfirm"
-        >
-          <el-button slot="append" icon="el-icon-search" @click="handleSearchConfirm"></el-button>
-        </el-input>
         <el-select
-          v-else-if="fieldMeta.fieldType === 'enum'"
+          v-if="hasEnumOptions"
           v-model="searchValue"
           size="mini"
           :placeholder="'选择' + fieldMeta.fieldLabel"
@@ -56,13 +45,24 @@
           @change="handleSearchConfirm"
         >
           <el-option
-            v-for="opt in fieldMeta.enumValues"
+            v-for="opt in normalizedEnumValues"
             :key="opt.value"
             :label="opt.label"
             :value="opt.value"
           />
         </el-select>
-        <div v-else-if="fieldMeta.fieldType === 'number'" class="range-search">
+        <el-input
+          v-else-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType"
+          ref="searchInput"
+          v-model="searchValue"
+          size="mini"
+          :placeholder="'输入' + fieldMeta.fieldLabel"
+          clearable
+          @keyup.enter.native="handleSearchConfirm"
+        >
+          <el-button slot="append" icon="el-icon-search" @click="handleSearchConfirm"></el-button>
+        </el-input>
+        <div v-else-if="fieldMeta.fieldType === 'number' || fieldMeta.fieldType === 'currency'" class="range-search">
           <el-input
             v-model="searchValue.min"
             size="mini"
@@ -178,13 +178,29 @@ export default {
 
     popoverWidth() {
       if (this.fieldMeta.fieldType === 'date') return 320
-      if (this.fieldMeta.fieldType === 'number') return 280
-      if (this.fieldMeta.fieldType === 'enum') return 220
+      if (this.fieldMeta.fieldType === 'number' || this.fieldMeta.fieldType === 'currency') return 280
+      if (this.hasEnumOptions) return 220
       return 200
+    },
+
+    normalizedEnumValues() {
+      return this._normalizeEnumValues(this.fieldMeta.enumValues)
+    },
+
+    hasEnumOptions() {
+      return this.normalizedEnumValues.length > 0
     }
   },
 
   methods: {
+    _normalizeEnumValues(enumValues) {
+      if (!enumValues) return []
+      if (Array.isArray(enumValues)) return enumValues
+      if (typeof enumValues === 'object') {
+        return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
+      }
+      return []
+    },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue
       this.initSearchValue()
@@ -193,7 +209,9 @@ export default {
     initSearchValue() {
       const meta = this.fieldMeta
       const saved = this.columnSearchValue
-      if (meta.fieldType === 'number') {
+      if (this.hasEnumOptions) {
+        this.searchValue = Array.isArray(saved) ? [...saved] : []
+      } else if (meta.fieldType === 'number' || meta.fieldType === 'currency') {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
           ? { min: saved.min || '', max: saved.max || '' }
           : { min: '', max: '' }
@@ -201,8 +219,6 @@ export default {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
           ? { start: saved.start || '', end: saved.end || '' }
           : { start: '', end: '' }
-      } else if (meta.fieldType === 'enum') {
-        this.searchValue = Array.isArray(saved) ? [...saved] : []
       } else {
         this.searchValue = saved || ''
       }

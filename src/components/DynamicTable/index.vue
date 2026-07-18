@@ -47,7 +47,8 @@
         v-if="showSelection"
         type="selection"
         width="50"
-        :fixed="frozenFields.includes('__selection') ? 'left' : false"
+        :fixed="getFrozenFixed('__selection')"
+        :header-align="headerAlign"
         align="center"
       />
 
@@ -56,17 +57,19 @@
         type="index"
         label="#"
         width="50"
-        :fixed="frozenFields.includes('__index') ? 'left' : false"
+        :fixed="getFrozenFixed('__index')"
+        :header-align="headerAlign"
         align="center"
       />
 
-      <template v-for="fieldKey in frozenColumns">
+      <template v-for="fieldKey in frozenLeftColumns">
         <el-table-column
-          :key="'frozen-' + fieldKey"
+          :key="'frozen-left-' + fieldKey"
           :prop="fieldKey"
           :width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined"
           :min-width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined"
           :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
+          :header-align="headerAlign"
           fixed="left"
           show-overflow-tooltip
         >
@@ -101,6 +104,42 @@
           :width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined"
           :min-width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined"
           :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
+          :header-align="headerAlign"
+          show-overflow-tooltip
+        >
+          <template slot="header">
+            <column-header
+              :field-key="fieldKey"
+              :field-meta="fieldMetaMap[fieldKey]"
+              :column-search-value="columnSearchValues[fieldKey]"
+              :current-sort-order="currentSortBy === fieldKey ? currentSortOrder : ''"
+              @sort-change="handleColumnSortChange"
+              @search-change="handleColumnSearchChange"
+              @search-confirm="handleColumnSearchConfirm"
+              @search-clear="handleColumnSearchClear"
+            />
+          </template>
+          <template slot-scope="scope">
+            <slot
+              :name="'column-' + fieldKey"
+              :row="scope.row"
+              :value="scope.row[fieldKey]"
+            >
+              {{ formatCellValue(scope.row[fieldKey], fieldMetaMap[fieldKey]) }}
+            </slot>
+          </template>
+        </el-table-column>
+      </template>
+
+      <template v-for="fieldKey in frozenRightColumns">
+        <el-table-column
+          :key="'frozen-right-' + fieldKey"
+          :prop="fieldKey"
+          :width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined"
+          :min-width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined"
+          :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
+          :header-align="headerAlign"
+          fixed="right"
           show-overflow-tooltip
         >
           <template slot="header">
@@ -128,14 +167,23 @@
       </template>
 
       <el-table-column
-        v-if="$slots['row-actions']"
+        v-if="hasRowActions"
         label="操作"
         :width="actionColumnWidth"
-        fixed="right"
+        :fixed="getActionColumnFixed"
+        :header-align="headerAlign"
         align="center"
       >
         <template slot-scope="scope">
-          <slot name="row-actions" :row="scope.row" :$index="scope.$index"></slot>
+          <template v-for="(action, idx) in rowActions">
+            <el-button
+              :key="idx"
+              type="text"
+              size="mini"
+              :style="action.style || {}"
+              @click="handleRowAction(action, scope.row)"
+            >{{ action.label }}</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -157,12 +205,14 @@
       :field-meta-list="fieldMetaList"
       :visible-fields="visibleFields"
       :frozen-fields="frozenFields"
+      :frozen-positions="frozenPositions"
       :filter-fields="filterFields"
       :column-order="columnOrder"
       :filter-schemes="filterSchemes"
       :current-filter-values="filterValues"
       :show-selection="showSelection"
       :show-index="showIndex"
+      :show-actions="hasRowActions"
       @confirm="handleConfigChange"
     />
   </div>
@@ -202,6 +252,8 @@ export default {
     showIndex: { type: Boolean, default: false },
     showPagination: { type: Boolean, default: true },
     pageSizes: { type: Array, default: () => [10, 20, 50, 100] },
+    headerAlign: { type: String, default: 'center' },
+    rowActions: { type: Array, default: () => [] },
     actionColumnWidth: { type: [String, Number], default: 150 }
   },
 
@@ -225,6 +277,41 @@ export default {
     computedTableHeight() {
       if (this.tableHeight) return this.tableHeight
       return this.selfAdaptiveHeight
+    },
+
+    hasRowActions() {
+      return this.rowActions && this.rowActions.length > 0
+    },
+
+    getActionColumnFixed() {
+      const pos = this.frozenPositions['__actions']
+      if (pos === 'left') return 'left'
+      if (pos === 'right') return 'right'
+      return false
+    },
+
+    frozenLeftColumns() {
+      return this.orderedVisibleFields.filter(key => {
+        if (!this.frozenFields.includes(key)) return false
+        const pos = this.frozenPositions[key]
+        if (pos) return pos === 'left'
+        const meta = this.fieldMetaMap[key]
+        return !meta || meta.frozenPosition !== 'right'
+      })
+    },
+
+    frozenRightColumns() {
+      return this.orderedVisibleFields.filter(key => {
+        if (!this.frozenFields.includes(key)) return false
+        const pos = this.frozenPositions[key]
+        if (pos) return pos === 'right'
+        const meta = this.fieldMetaMap[key]
+        return meta && meta.frozenPosition === 'right'
+      })
+    },
+
+    normalColumns() {
+      return this.orderedVisibleFields.filter(key => !this.frozenFields.includes(key))
     }
   },
 
@@ -278,14 +365,47 @@ export default {
 
     formatCellValue(value, meta) {
       if (!meta) return value
-      if (meta.fieldType === 'enum' && meta.enumValues && meta.enumValues.length > 0) {
-        const found = meta.enumValues.find(v => v.value === value)
-        return found ? found.label : value
+      if (value === null || value === undefined || value === '') return ''
+      const enumList = this._normalizeEnumValues(meta.enumValues)
+      if (enumList.length > 0) {
+        const found = enumList.find(v => v.value === value)
+        if (found) return found.label
+      }
+      if (meta.fieldType === 'currency') {
+        return this._formatCurrency(value)
       }
       if (meta.formatter && typeof meta.formatter === 'function') {
         return meta.formatter(value)
       }
       return value
+    },
+
+    _formatCurrency(value) {
+      const num = Number(value)
+      if (isNaN(num)) return value
+      return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    },
+
+    _normalizeEnumValues(enumValues) {
+      if (!enumValues) return []
+      if (Array.isArray(enumValues)) return enumValues
+      if (typeof enumValues === 'object') {
+        return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
+      }
+      return []
+    },
+
+    getFrozenFixed(fieldKey) {
+      if (!this.frozenFields.includes(fieldKey)) return false
+      const pos = this.frozenPositions[fieldKey]
+      if (pos === 'right') return 'right'
+      const meta = this.fieldMetaMap[fieldKey]
+      if (meta && meta.frozenPosition === 'right') return 'right'
+      return 'left'
+    },
+
+    handleRowAction(action, row) {
+      this.$emit('row-action', { action: action.action, row })
     },
 
 
@@ -404,18 +524,19 @@ export default {
     applySchemeValues(schemeFilterValues) {
       const newValues = {}
       this.activeFilterMetaList.forEach(meta => {
+        const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
         if (schemeFilterValues && schemeFilterValues[meta.fieldKey] !== undefined) {
           newValues[meta.fieldKey] = JSON.parse(JSON.stringify(schemeFilterValues[meta.fieldKey]))
+        } else if (hasEnum) {
+          newValues[meta.fieldKey] = []
         } else {
           switch (meta.fieldType) {
             case 'number':
+            case 'currency':
               newValues[meta.fieldKey] = { min: '', max: '' }
               break
             case 'date':
               newValues[meta.fieldKey] = { start: '', end: '' }
-              break
-            case 'enum':
-              newValues[meta.fieldKey] = []
               break
             case 'boolean':
               newValues[meta.fieldKey] = ''

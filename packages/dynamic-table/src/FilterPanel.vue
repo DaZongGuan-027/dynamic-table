@@ -23,7 +23,24 @@
             >
               <div class="filter-label">{{ meta.fieldLabel }}</div>
               <div class="filter-control">
-                <template v-if="meta.fieldType === 'string'">
+                <template v-if="hasEnumOptions(meta)">
+                  <el-select
+                    v-model="filterValues[meta.fieldKey]"
+                    :placeholder="'请选择' + meta.fieldLabel"
+                    multiple
+                    clearable
+                    collapse-tags
+                  >
+                    <el-option
+                      v-for="opt in normalizeEnumValues(meta.enumValues)"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                </template>
+
+                <template v-else-if="meta.fieldType === 'string'">
                   <el-input
                     v-model="filterValues[meta.fieldKey]"
                     :placeholder="'请输入' + meta.fieldLabel"
@@ -32,7 +49,7 @@
                   />
                 </template>
 
-                <template v-else-if="meta.fieldType === 'number'">
+                <template v-else-if="meta.fieldType === 'number' || meta.fieldType === 'currency'">
                   <div class="range-input">
                     <el-input
                       v-model="filterValues[meta.fieldKey].min"
@@ -48,23 +65,6 @@
                       @keyup.enter.native="$emit('apply')"
                     />
                   </div>
-                </template>
-
-                <template v-else-if="meta.fieldType === 'enum'">
-                  <el-select
-                    v-model="filterValues[meta.fieldKey]"
-                    :placeholder="'请选择' + meta.fieldLabel"
-                    multiple
-                    clearable
-                    collapse-tags
-                  >
-                    <el-option
-                      v-for="opt in meta.enumValues"
-                      :key="opt.value"
-                      :label="opt.label"
-                      :value="opt.value"
-                    />
-                  </el-select>
                 </template>
 
                 <template v-else-if="meta.fieldType === 'date'">
@@ -191,7 +191,18 @@ export default {
 
   methods: {
     isRangeType(fieldType) {
-      return fieldType === 'date' || fieldType === 'number'
+      return fieldType === 'date' || fieldType === 'number' || fieldType === 'currency'
+    },
+    hasEnumOptions(meta) {
+      return meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
+    },
+    normalizeEnumValues(enumValues) {
+      if (!enumValues) return []
+      if (Array.isArray(enumValues)) return enumValues
+      if (typeof enumValues === 'object') {
+        return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
+      }
+      return []
     },
     handleSchemeCommand(index) {
       const scheme = this.filterSchemes[index]

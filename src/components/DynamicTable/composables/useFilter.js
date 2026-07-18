@@ -29,21 +29,24 @@ export default {
     initFilterValues() {
       const values = {}
       this.activeFilterMetaList.forEach(meta => {
-        switch (meta.fieldType) {
-          case 'number':
-            values[meta.fieldKey] = { min: '', max: '' }
-            break
-          case 'date':
-            values[meta.fieldKey] = { start: '', end: '' }
-            break
-          case 'enum':
-            values[meta.fieldKey] = []
-            break
-          case 'boolean':
-            values[meta.fieldKey] = ''
-            break
-          default:
-            values[meta.fieldKey] = ''
+        const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
+        if (hasEnum) {
+          values[meta.fieldKey] = []
+        } else {
+          switch (meta.fieldType) {
+            case 'number':
+            case 'currency':
+              values[meta.fieldKey] = { min: '', max: '' }
+              break
+            case 'date':
+              values[meta.fieldKey] = { start: '', end: '' }
+              break
+            case 'boolean':
+              values[meta.fieldKey] = ''
+              break
+            default:
+              values[meta.fieldKey] = ''
+          }
         }
       })
       this.filterValues = values

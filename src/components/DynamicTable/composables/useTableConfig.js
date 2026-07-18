@@ -13,6 +13,7 @@ export default {
       config: null,
       visibleFields: [],
       frozenFields: [],
+      frozenPositions: {},
       filterFields: [],
       columnOrder: [],
       filterSchemes: []
@@ -35,13 +36,6 @@ export default {
       return this.visibleFields
     },
 
-    frozenColumns() {
-      return this.orderedVisibleFields.filter(key => this.frozenFields.includes(key))
-    },
-
-    normalColumns() {
-      return this.orderedVisibleFields.filter(key => !this.frozenFields.includes(key))
-    },
 
     activeFilterMetaList() {
       return this.filterFields
@@ -68,6 +62,7 @@ export default {
           this.config = config
           this.visibleFields = this._parseJsonField(config.visibleFields) || this.fieldMetaList.map(f => f.fieldKey)
           this.frozenFields = this._parseJsonField(config.frozenFields) || []
+          this.frozenPositions = this._parseJsonField(config.frozenPositions) || {}
           this.filterFields = this._parseJsonField(config.filterFields) || []
           this.columnOrder = this._parseJsonField(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
           this.filterSchemes = this._parseJsonField(config.filterSchemes) || []
@@ -92,6 +87,7 @@ export default {
     resetToDefault() {
       this.visibleFields = this.fieldMetaList.map(f => f.fieldKey)
       this.frozenFields = []
+      this.frozenPositions = {}
       this.filterFields = []
       this.columnOrder = this.fieldMetaList.map(f => f.fieldKey)
       this.filterSchemes = []
@@ -118,16 +114,18 @@ export default {
         userId: this.userId,
         visibleFields: JSON.stringify(this.visibleFields),
         frozenFields: JSON.stringify(this.frozenFields),
+        frozenPositions: JSON.stringify(this.frozenPositions),
         filterFields: JSON.stringify(this.filterFields),
         columnOrder: JSON.stringify(this.columnOrder),
         filterSchemes: JSON.stringify(this.filterSchemes)
       }
     },
 
-    handleConfigChange({ visibleFields, columnOrder, frozenFields, filterFields, filterSchemes }) {
+    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, filterFields, filterSchemes }) {
       this.visibleFields = visibleFields
       this.columnOrder = columnOrder
       this.frozenFields = frozenFields
+      this.frozenPositions = frozenPositions || {}
       this.filterFields = filterFields
       this.filterSchemes = filterSchemes
       this.saveConfig()

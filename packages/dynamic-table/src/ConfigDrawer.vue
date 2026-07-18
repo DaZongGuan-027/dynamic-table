@@ -39,12 +39,19 @@
           >
             <el-checkbox v-model="item.visible" class="column-visible-check" @change="handleVisibleChange(item)">{{ item.fieldLabel }}</el-checkbox>
             <div class="config-item-right">
-              <el-tooltip :content="item.frozen ? '取消冻结' : '冻结该列'" placement="top" :open-delay="300">
+              <el-tooltip content="冻结到左侧" placement="top" :open-delay="300">
                 <i
-                  class="freeze-icon"
-                  :class="item.frozen ? 'el-icon-lock is-frozen' : 'el-icon-unlock'"
-                  @click="item.visible && (item.frozen = !item.frozen)"
-                ></i>
+                  class="freeze-icon freeze-left"
+                  :class="{ 'is-active': item.frozenPosition === 'left' }"
+                  @click="item.visible && handleFreezeLeft(item)"
+                >◀</i>
+              </el-tooltip>
+              <el-tooltip content="冻结到右侧" placement="top" :open-delay="300">
+                <i
+                  class="freeze-icon freeze-right"
+                  :class="{ 'is-active': item.frozenPosition === 'right' }"
+                  @click="item.visible && handleFreezeRight(item)"
+                >▶</i>
               </el-tooltip>
               <i class="el-icon-rank drag-handle"></i>
             </div>
@@ -143,12 +150,14 @@ export default {
     fieldMetaList: { type: Array, default: () => [] },
     visibleFields: { type: Array, default: () => [] },
     frozenFields: { type: Array, default: () => [] },
+    frozenPositions: { type: Object, default: () => ({}) },
     filterFields: { type: Array, default: () => [] },
     columnOrder: { type: Array, default: () => [] },
     filterSchemes: { type: Array, default: () => [] },
     currentFilterValues: { type: Object, default: () => ({}) },
     showSelection: { type: Boolean, default: false },
-    showIndex: { type: Boolean, default: false }
+    showIndex: { type: Boolean, default: false },
+    showActions: { type: Boolean, default: false }
   },
 
   data() {
@@ -194,14 +203,14 @@ export default {
     freezeAllChecked: {
       get() {
         const visible = this.editColumnList.filter(i => i.visible)
-        return visible.length > 0 && visible.every(i => i.frozen)
+        return visible.length > 0 && visible.every(i => i.frozenPosition)
       },
       set() {}
     },
 
     freezeIndeterminate() {
       const visible = this.editColumnList.filter(i => i.visible)
-      const checked = visible.filter(i => i.frozen).length
+      const checked = visible.filter(i => i.frozenPosition).length
       return checked > 0 && checked < visible.length
     },
 
@@ -243,7 +252,7 @@ export default {
           fieldKey: '__selection',
           fieldLabel: '选择框',
           visible: true,
-          frozen: this.frozenFields.includes('__selection'),
+          frozenPosition: this.frozenFields.includes('__selection') ? 'left' : '',
           isSpecial: true
         })
       }
@@ -252,17 +261,30 @@ export default {
           fieldKey: '__index',
           fieldLabel: '序号',
           visible: true,
-          frozen: this.frozenFields.includes('__index'),
+          frozenPosition: this.frozenFields.includes('__index') ? 'left' : '',
+          isSpecial: true
+        })
+      }
+      if (this.showActions) {
+        columnList.push({
+          fieldKey: '__actions',
+          fieldLabel: '操作',
+          visible: true,
+          frozenPosition: this.frozenFields.includes('__actions') ? (this.frozenPositions['__actions'] || 'right') : '',
           isSpecial: true
         })
       }
       allKeys.forEach(key => {
         const meta = this.fieldMetaList.find(f => f.fieldKey === key)
+        let frozenPosition = ''
+        if (this.frozenFields.includes(key)) {
+          frozenPosition = (meta && meta.frozenPosition === 'right') ? 'right' : 'left'
+        }
         columnList.push({
           fieldKey: key,
           fieldLabel: meta ? meta.fieldLabel : key,
           visible: this.visibleFields.includes(key),
-          frozen: this.frozenFields.includes(key),
+          frozenPosition,
           isSpecial: false
         })
       })
@@ -301,24 +323,42 @@ export default {
         number: '数值',
         enum: '枚举',
         date: '日期',
-        boolean: '布尔'
+        boolean: '布尔',
+        currency: '金额'
       }
       return map[type] || type
+    },
+
+    _normalizeEnumValues(enumValues) {
+      if (!enumValues) return []
+      if (Array.isArray(enumValues)) return enumValues
+      if (typeof enumValues === 'object') {
+        return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
+      }
+      return []
     },
 
     handleColumnAllChange(val) {
       this.editColumnList.forEach(item => {
         item.visible = val
-        if (!val) item.frozen = false
+        if (!val) item.frozenPosition = ''
       })
     },
 
+    handleFreezeLeft(item) {
+      item.frozenPosition = item.frozenPosition === 'left' ? '' : 'left'
+    },
+
+    handleFreezeRight(item) {
+      item.frozenPosition = item.frozenPosition === 'right' ? '' : 'right'
+    },
+
     handleFreezeAllChange(val) {
-      this.editColumnList.filter(i => i.visible).forEach(item => { item.frozen = val })
+      this.editColumnList.filter(i => i.visible).forEach(item => { item.frozenPosition = val ? 'left' : '' })
     },
 
     handleVisibleChange(item) {
-      if (!item.visible) item.frozen = false
+      if (!item.visible) item.frozenPosition = ''
     },
 
     handleFilterAllChange(val) {
@@ -371,10 +411,12 @@ export default {
           if (subParts.length > 0) parts.push(meta.fieldLabel + subParts.join(' '))
         } else if (Array.isArray(val)) {
           if (val.length > 0) {
+            const enumList = this._normalizeEnumValues(meta.enumValues)
             const labels = val.map(v => {
-              const found = (meta.enumValues || []).find(e => e.value === v)
+              const found = enumList.find(e => e.value === v)
               return found ? found.label : v
             })
+
             parts.push(meta.fieldLabel + ':' + labels.join(','))
           }
         } else {
@@ -387,7 +429,11 @@ export default {
     handleConfirm() {
       const visibleFields = this.editColumnList.filter(i => i.visible && !i.isSpecial).map(i => i.fieldKey)
       const columnOrder = this.editColumnList.filter(i => !i.isSpecial).map(i => i.fieldKey)
-      const frozenFields = this.editColumnList.filter(i => i.visible && i.frozen).map(i => i.fieldKey)
+      const frozenFields = this.editColumnList.filter(i => i.visible && i.frozenPosition).map(i => i.fieldKey)
+      const frozenPositions = {}
+      this.editColumnList.filter(i => i.visible && i.frozenPosition).forEach(i => {
+        frozenPositions[i.fieldKey] = i.frozenPosition
+      })
       const filterFields = this.editFilterList.filter(i => i.checked).map(i => i.fieldKey)
       const filterSchemes = this.editSchemes.map(s => ({
         name: s.name,
@@ -398,6 +444,7 @@ export default {
         visibleFields,
         columnOrder,
         frozenFields,
+        frozenPositions,
         filterFields,
         filterSchemes
       })
@@ -462,16 +509,21 @@ export default {
   gap: 10px;
 }
 .freeze-icon {
-  font-size: 14px;
+  font-size: 12px;
   color: #c0c4cc;
   cursor: pointer;
   transition: color 0.2s;
+  font-style: normal;
+  user-select: none;
 }
 .freeze-icon:hover {
   color: #409eff;
 }
-.freeze-icon.is-frozen {
+.freeze-icon.is-active {
   color: #409eff;
+}
+.freeze-right.is-active {
+  color: #e6a23c;
 }
 .drag-handle {
   cursor: grab;

@@ -9,35 +9,15 @@
     row-key="id"
     :show-selection="true"
     :show-index="true"
+    :row-actions="actions"
+    action-column-fixed="right"
     @selection-change="handleSelectionChange"
+    @row-action="handleRowAction"
   >
     <template #toolbar-left>
       <el-button type="primary" icon="el-icon-download" size="small">导出</el-button>
-      <el-button type="danger" icon="el-icon-delete" size="small" :disabled="!selectedRows.length">批量删除</el-button>
     </template>
 
-    <template #column-debitAmount="{ row }">
-      <span class="amount debit">{{ row.debitAmount > 0 ? row.debitAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '' }}</span>
-    </template>
-
-    <template #column-creditAmount="{ row }">
-      <span class="amount credit">{{ row.creditAmount > 0 ? row.creditAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '' }}</span>
-    </template>
-
-    <template #column-balance="{ row }">
-      <span class="amount">{{ row.balance.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
-    </template>
-
-    <template #column-balanceDirection="{ row }">
-      <el-tag :type="row.balanceDirection === '借' ? 'danger' : 'success'" size="mini" effect="plain">
-        {{ row.balanceDirection }}
-      </el-tag>
-    </template>
-
-    <template #row-actions="{ row }">
-      <el-button type="text" size="mini" @click="handleView(row)">查看凭证</el-button>
-      <el-button type="text" size="mini" @click="handleEdit(row)">修改</el-button>
-    </template>
   </dynamic-table>
 </template>
 
@@ -54,6 +34,11 @@ export default {
     return {
       userId: 'U10001',
       selectedRows: [],
+      actions: [
+        { label: '查看凭证', action: 'view' },
+        { label: '修改', action: 'edit' },
+        { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
+      ],
 
       fieldMetaList: [
         {
@@ -113,7 +98,7 @@ export default {
         {
           fieldKey: 'debitAmount',
           fieldLabel: '借方金额',
-          fieldType: 'number',
+          fieldType: 'currency',
           filterable: true,
           sortable: true,
           width: 120,
@@ -122,7 +107,7 @@ export default {
         {
           fieldKey: 'creditAmount',
           fieldLabel: '贷方金额',
-          fieldType: 'number',
+          fieldType: 'currency',
           filterable: true,
           sortable: true,
           width: 120,
@@ -144,7 +129,7 @@ export default {
         {
           fieldKey: 'balance',
           fieldLabel: '余额',
-          fieldType: 'number',
+          fieldType: 'currency',
           filterable: true,
           sortable: true,
           width: 130,
@@ -234,12 +219,16 @@ export default {
       this.selectedRows = selection
     },
 
-    handleView(row) {
-      this.$message.info('查看凭证: ' + row.voucherNo)
-    },
-
-    handleEdit(row) {
-      this.$message.info('修改: ' + row.voucherNo)
+    handleRowAction({ action, row }) {
+      if (action === 'view') {
+        this.$message.info('查看凭证: ' + row.voucherNo)
+      } else if (action === 'edit') {
+        this.$message.info('修改: ' + row.voucherNo)
+      } else if (action === 'delete') {
+        this.$confirm('确认删除凭证 ' + row.voucherNo + '？', '提示', { type: 'warning' })
+          .then(() => { this.$message.success('已删除') })
+          .catch(() => {})
+      }
     }
   }
 }
