@@ -303,23 +303,16 @@ export default {
 }
 
 .filter-body {
-  padding: 16px;
+  padding: 10px;
+  padding-right: 4px;
 }
 .filter-form-scroll {
   max-height: 120px;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-right: 2px;
 }
-.filter-form-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-.filter-form-scroll::-webkit-scrollbar-thumb {
-  background: #dcdfe6;
-  border-radius: 3px;
-}
-.filter-form-scroll::-webkit-scrollbar-thumb:hover {
-  background: #c0c4cc;
-}
+
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
