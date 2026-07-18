@@ -605,10 +605,14 @@ export default {
   height: 100%;
   box-sizing: border-box;
 }
+.dynamic-table >>> .el-table th {
+  background: #ecf5ff;
+}
 .table-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 16px;
   padding: 8px 0;
   margin-bottom: 0;
   flex-shrink: 0;
@@ -617,6 +621,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+.toolbar-left .el-button {
+  margin-left: 0;
 }
 .toolbar-right {
   display: flex;

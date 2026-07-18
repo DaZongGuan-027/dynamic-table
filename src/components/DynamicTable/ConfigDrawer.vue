@@ -105,14 +105,35 @@
             class="scheme-item"
           >
             <div class="scheme-header">
-              <span class="scheme-name-text">{{ scheme.name || '方案' + (index + 1) }}</span>
-              <el-button
-                type="text"
-                icon="el-icon-delete"
-                size="mini"
-                class="scheme-delete-btn"
-                @click="removeScheme(index)"
-              />
+              <template v-if="editingSchemeIndex === index">
+                <el-input
+                  v-model="editingSchemeName"
+                  size="mini"
+                  class="scheme-name-input"
+                  @blur="confirmRenameScheme(index)"
+                  @keyup.enter.native="confirmRenameScheme(index)"
+                />
+              </template>
+              <template v-else>
+                <span class="scheme-name-text" @click="startRenameScheme(index)" title="点击修改名称">{{ scheme.name || '方案' + (index + 1) }}</span>
+              </template>
+              <div class="scheme-header-actions">
+                <el-button
+                  v-if="editingSchemeIndex !== index"
+                  type="text"
+                  icon="el-icon-edit"
+                  size="mini"
+                  class="scheme-rename-btn"
+                  @click="startRenameScheme(index)"
+                />
+                <el-button
+                  type="text"
+                  icon="el-icon-delete"
+                  size="mini"
+                  class="scheme-delete-btn"
+                  @click="removeScheme(index)"
+                />
+              </div>
             </div>
             <div class="scheme-desc" v-if="scheme.filterValues && hasActiveFilter(scheme.filterValues)">
               <span class="scheme-desc-label">筛选条件:</span>
@@ -166,7 +187,9 @@ export default {
       editColumnList: [],
 
       editFilterList: [],
-      editSchemes: []
+      editSchemes: [],
+      editingSchemeIndex: -1,
+      editingSchemeName: ''
     }
   },
 
@@ -378,6 +401,29 @@ export default {
 
     removeScheme(index) {
       this.editSchemes.splice(index, 1)
+      if (this.editingSchemeIndex === index) {
+        this.editingSchemeIndex = -1
+        this.editingSchemeName = ''
+      } else if (this.editingSchemeIndex > index) {
+        this.editingSchemeIndex--
+      }
+    },
+
+    startRenameScheme(index) {
+      this.editingSchemeIndex = index
+      this.editingSchemeName = this.editSchemes[index].name || '方案' + (index + 1)
+      this.$nextTick(() => {
+        const input = this.$el.querySelector('.scheme-name-input .el-input__inner')
+        if (input) input.focus()
+      })
+    },
+
+    confirmRenameScheme(index) {
+      if (this.editingSchemeName.trim()) {
+        this.editSchemes[index].name = this.editingSchemeName.trim()
+      }
+      this.editingSchemeIndex = -1
+      this.editingSchemeName = ''
     },
 
     hasActiveFilter(filterValues) {
@@ -567,6 +613,25 @@ export default {
   font-size: 14px;
   font-weight: 500;
   color: #303133;
+  cursor: pointer;
+}
+.scheme-name-text:hover {
+  color: #409eff;
+}
+.scheme-name-input {
+  flex: 1;
+  margin-right: 8px;
+}
+.scheme-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.scheme-rename-btn {
+  color: #909399 !important;
+}
+.scheme-rename-btn:hover {
+  color: #409eff !important;
 }
 .scheme-delete-btn {
   color: #f56c6c !important;
