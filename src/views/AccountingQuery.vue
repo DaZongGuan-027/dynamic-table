@@ -1,16 +1,13 @@
 <template>
   <dynamic-table
     menu-id="M002"
-    :user-id="userId"
+
     :field-meta-list="fieldMetaList"
     :fetch-data-fn="fetchDataFn"
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
     row-key="id"
-    :show-selection="true"
-    :show-index="true"
-    :row-actions="actions"
-    action-column-fixed="right"
+
     @selection-change="handleSelectionChange"
     @row-action="handleRowAction"
   >
@@ -22,7 +19,7 @@
 </template>
 
 <script>
-import DynamicTable from '../components/DynamicTable/index.vue'
+import DynamicTable from '../../packages/dynamic-table/src/index.vue'
 import { getAccountingData, getTableConfig, saveTableConfig } from '../mock/api'
 
 export default {
@@ -32,15 +29,12 @@ export default {
 
   data() {
     return {
-      userId: 'U10001',
+
       selectedRows: [],
-      actions: [
-        { label: '查看凭证', action: 'view' },
-        { label: '修改', action: 'edit' },
-        { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
-      ],
 
       fieldMetaList: [
+        { fieldKey: '__selection', fieldLabel: '选择框', fieldType: 'selection', width: 50 },
+        { fieldKey: '__index', fieldLabel: '序号', fieldType: 'index', width: 50 },
         {
           fieldKey: 'voucherNo',
           fieldLabel: '凭证字号',
@@ -197,7 +191,12 @@ export default {
           sortable: true,
           width: 80,
           align: 'center'
-        }
+        },
+        { fieldKey: '__actions', fieldLabel: '操作', fieldType: 'actions', width: 150, frozenPosition: 'right', actions: [
+          { label: '查看凭证', action: 'view' },
+          { label: '修改', action: 'edit' },
+          { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
+        ]}
       ]
     }
   },
@@ -207,8 +206,8 @@ export default {
       return getAccountingData(params)
     },
 
-    loadConfigFn(menuId, userId) {
-      return getTableConfig(menuId, userId)
+    loadConfigFn(menuId) {
+      return getTableConfig(menuId)
     },
 
     saveConfigFn(config) {

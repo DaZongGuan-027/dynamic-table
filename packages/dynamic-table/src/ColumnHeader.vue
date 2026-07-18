@@ -51,58 +51,67 @@
             :value="opt.value"
           />
         </el-select>
-        <el-input
-          v-else-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType"
-          ref="searchInput"
-          v-model="searchValue"
-          size="mini"
-          :placeholder="'输入' + fieldMeta.fieldLabel"
-          clearable
-          @keyup.enter.native="handleSearchConfirm"
-        >
-          <el-button slot="append" icon="el-icon-search" @click="handleSearchConfirm"></el-button>
-        </el-input>
-        <div v-else-if="fieldMeta.fieldType === 'number' || fieldMeta.fieldType === 'currency'" class="range-search">
-          <el-input
-            v-model="searchValue.min"
+        <div v-else-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType" class="compare-search">
+          <el-select
+            v-model="searchValue.operator"
             size="mini"
-            placeholder="最小值"
-            clearable
-            @keyup.enter.native="handleSearchConfirm"
-          />
-          <span class="range-sep">~</span>
+            placeholder="条件"
+            style="width: 90px; flex-shrink: 0"
+          >
+            <el-option label="等于" value="eq" />
+            <el-option label="不等于" value="neq" />
+            <el-option label="包含" value="contains" />
+            <el-option label="不包含" value="notContains" />
+            <el-option label="大于" value="gt" />
+            <el-option label="小于" value="lt" />
+          </el-select>
           <el-input
-            v-model="searchValue.max"
+            v-model="searchValue.value"
             size="mini"
-            placeholder="最大值"
+            :placeholder="'输入' + fieldMeta.fieldLabel"
             clearable
             @keyup.enter.native="handleSearchConfirm"
           />
           <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>
         </div>
-        <div v-else-if="fieldMeta.fieldType === 'date'" class="range-search date-range">
-          <el-date-picker
-            v-model="searchValue.start"
-            type="date"
+        <div v-else-if="fieldMeta.fieldType === 'number' || fieldMeta.fieldType === 'currency'" class="compare-search">
+          <el-select
+            v-model="searchValue.operator"
             size="mini"
-            placeholder="开始日期"
+            placeholder="条件"
+            style="width: 90px; flex-shrink: 0"
+          >
+            <el-option label="等于" value="eq" />
+            <el-option label="大于" value="gt" />
+            <el-option label="小于" value="lt" />
+            <el-option label="大于等于" value="gte" />
+            <el-option label="小于等于" value="lte" />
+            <el-option label="包含" value="contains" />
+            <el-option label="不包含" value="notContains" />
+          </el-select>
+          <el-input
+            v-model="searchValue.value"
+            size="mini"
+            :placeholder="'输入' + fieldMeta.fieldLabel"
+            clearable
+            @keyup.enter.native="handleSearchConfirm"
+          />
+          <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>
+        </div>
+         <div v-else-if="fieldMeta.fieldType === 'date'" class="date-search">
+          <el-date-picker
+            v-model="searchValue.range"
+            type="daterange"
+            size="mini"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
             value-format="yyyy-MM-dd"
             clearable
+            :picker-options="datePickerOptions"
             style="width: 100%"
-            @change="handleDateChange"
           />
-          <span class="range-sep">~</span>
-          <el-date-picker
-            v-model="searchValue.end"
-            type="date"
-            size="mini"
-            placeholder="结束日期"
-            value-format="yyyy-MM-dd"
-            clearable
-            style="width: 100%"
-            @change="handleDateChange"
-          />
-          <el-button size="mini" icon="el-icon-search" type="primary" class="date-search-btn" @click="handleSearchConfirm"></el-button>
+          <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>
         </div>
         <div v-else-if="fieldMeta.fieldType === 'boolean'" class="bool-search">
           <el-select
@@ -144,7 +153,56 @@ export default {
     return {
       popoverVisible: false,
       showSearch: false,
-      searchValue: ''
+      searchValue: '',
+      datePickerOptions: {
+        shortcuts: [
+          {
+            text: '本月',
+            onClick(picker) {
+              const start = new Date()
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '上月',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(start.getMonth() - 1)
+              start.setDate(1)
+              const end = new Date()
+              end.setDate(0)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '近三个月',
+            onClick(picker) {
+              const end = new Date()
+              const start = new Date()
+              start.setMonth(start.getMonth() - 3)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '本年',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(0)
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '重置',
+            onClick(picker) {
+              picker.$emit('pick', [])
+            }
+          }
+        ]
+      }
     }
   },
 
@@ -177,10 +235,7 @@ export default {
     },
 
     popoverWidth() {
-      if (this.fieldMeta.fieldType === 'date') return 320
-      if (this.fieldMeta.fieldType === 'number' || this.fieldMeta.fieldType === 'currency') return 280
-      if (this.hasEnumOptions) return 220
-      return 200
+      return Math.max(280, Math.floor(window.innerWidth * 0.3))
     },
 
     normalizedEnumValues() {
@@ -189,6 +244,7 @@ export default {
 
     hasEnumOptions() {
       return this.normalizedEnumValues.length > 0
+
     }
   },
 
@@ -211,14 +267,18 @@ export default {
       const saved = this.columnSearchValue
       if (this.hasEnumOptions) {
         this.searchValue = Array.isArray(saved) ? [...saved] : []
+      } else if (meta.fieldType === 'string' || !meta.fieldType) {
+        this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
+          ? { operator: saved.operator || 'contains', value: saved.value || '' }
+          : { operator: 'contains', value: '' }
       } else if (meta.fieldType === 'number' || meta.fieldType === 'currency') {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
-          ? { min: saved.min || '', max: saved.max || '' }
-          : { min: '', max: '' }
+          ? { operator: saved.operator || 'eq', value: saved.value || '' }
+          : { operator: 'eq', value: '' }
       } else if (meta.fieldType === 'date') {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
-          ? { start: saved.start || '', end: saved.end || '' }
-          : { start: '', end: '' }
+          ? { range: saved.range || null }
+          : { range: null }
       } else {
         this.searchValue = saved || ''
       }
@@ -254,11 +314,6 @@ export default {
       this.popoverVisible = false
     },
 
-    handleDateChange() {
-      if (this.searchValue.start && this.searchValue.end) {
-        this.handleSearchConfirm()
-      }
-    },
 
     handleReset() {
       this.$emit('search-clear', this.fieldKey)
@@ -336,28 +391,19 @@ export default {
   padding: 8px 10px;
   border-top: 1px solid #dcdfe6;
 }
-.range-search {
+.compare-search {
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.range-search .el-input {
+.compare-search .el-input {
   flex: 1;
+  min-width: 0;
 }
-.date-range {
-  flex-wrap: wrap;
-}
-.date-range .range-sep {
-  display: none;
-}
-.date-search-btn {
-  margin-top: 6px;
-  width: 100%;
-}
-.range-sep {
-  color: #c0c4cc;
-  flex-shrink: 0;
-  font-size: 12px;
+.date-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .bool-search {
   width: 100%;

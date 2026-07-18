@@ -18,8 +18,7 @@
           <template v-for="meta in filterMetaList">
             <div
               :key="meta.fieldKey"
-              class="filter-grid-item"
-              :class="{ 'filter-grid-item--wide': isRangeType(meta.fieldType) }"
+              class="filter-grid-item filter-grid-item--wide"
             >
               <div class="filter-label">{{ meta.fieldLabel }}</div>
               <div class="filter-control">
@@ -41,26 +40,48 @@
                 </template>
 
                 <template v-else-if="meta.fieldType === 'string'">
-                  <el-input
-                    v-model="filterValues[meta.fieldKey]"
-                    :placeholder="'请输入' + meta.fieldLabel"
-                    clearable
-                    @keyup.enter.native="$emit('apply')"
-                  />
-                </template>
-
-                <template v-else-if="meta.fieldType === 'number' || meta.fieldType === 'currency'">
-                  <div class="range-input">
+                  <div class="compare-input">
+                    <el-select
+                      v-model="filterValues[meta.fieldKey].operator"
+                      placeholder="条件"
+                      style="width: 90px; flex-shrink: 0"
+                      @change="$emit('apply')"
+                    >
+                      <el-option label="等于" value="eq" />
+                      <el-option label="不等于" value="neq" />
+                      <el-option label="包含" value="contains" />
+                      <el-option label="不包含" value="notContains" />
+                      <el-option label="大于" value="gt" />
+                      <el-option label="小于" value="lt" />
+                    </el-select>
                     <el-input
-                      v-model="filterValues[meta.fieldKey].min"
-                      placeholder="最小值"
+                      v-model="filterValues[meta.fieldKey].value"
+                      :placeholder="'输入' + meta.fieldLabel"
                       clearable
                       @keyup.enter.native="$emit('apply')"
                     />
-                    <span class="range-separator">-</span>
+                  </div>
+                </template>
+
+                <template v-else-if="meta.fieldType === 'number' || meta.fieldType === 'currency'">
+                  <div class="compare-input">
+                    <el-select
+                      v-model="filterValues[meta.fieldKey].operator"
+                      placeholder="条件"
+                      style="width: 90px; flex-shrink: 0"
+                      @change="$emit('apply')"
+                    >
+                      <el-option label="等于" value="eq" />
+                      <el-option label="大于" value="gt" />
+                      <el-option label="小于" value="lt" />
+                      <el-option label="大于等于" value="gte" />
+                      <el-option label="小于等于" value="lte" />
+                      <el-option label="包含" value="contains" />
+                      <el-option label="不包含" value="notContains" />
+                    </el-select>
                     <el-input
-                      v-model="filterValues[meta.fieldKey].max"
-                      placeholder="最大值"
+                      v-model="filterValues[meta.fieldKey].value"
+                      :placeholder="'输入' + meta.fieldLabel"
                       clearable
                       @keyup.enter.native="$emit('apply')"
                     />
@@ -68,26 +89,19 @@
                 </template>
 
                 <template v-else-if="meta.fieldType === 'date'">
-                  <div class="range-input">
-                    <el-date-picker
-                      v-model="filterValues[meta.fieldKey].start"
-                      type="date"
-                      placeholder="开始日期"
-                      value-format="yyyy-MM-dd"
-                      clearable
-                      style="flex: 1"
-                    />
-                    <span class="range-separator">-</span>
-                    <el-date-picker
-                      v-model="filterValues[meta.fieldKey].end"
-                      type="date"
-                      placeholder="结束日期"
-                      value-format="yyyy-MM-dd"
-                      clearable
-                      style="flex: 1"
-                    />
-                  </div>
+                  <el-date-picker
+                    v-model="filterValues[meta.fieldKey].range"
+                    type="daterange"
+                    range-separator="至"
+                    start-placeholder="开始日期"
+                    end-placeholder="结束日期"
+                    value-format="yyyy-MM-dd"
+                    clearable
+                    :picker-options="datePickerOptions"
+                    style="width: 100%"
+                  />
                 </template>
+
 
                 <template v-else-if="meta.fieldType === 'boolean'">
                   <el-select
@@ -128,6 +142,8 @@
               </el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
+        </div>
+        <div class="filter-actions-right">
           <el-button
             size="small"
             :disabled="!hasActiveFilter"
@@ -135,8 +151,6 @@
           >
             保存筛选
           </el-button>
-        </div>
-        <div class="filter-actions-right">
           <el-button type="primary" icon="el-icon-search" size="small" @click="$emit('apply')">
             查询
           </el-button>
@@ -161,6 +175,60 @@ export default {
     activeSchemeIndex: { type: Number, default: -1 }
   },
 
+  data() {
+    return {
+      datePickerOptions: {
+        shortcuts: [
+          {
+            text: '本月',
+            onClick(picker) {
+              const start = new Date()
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '上月',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(start.getMonth() - 1)
+              start.setDate(1)
+              const end = new Date()
+              end.setDate(0)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '近三个月',
+            onClick(picker) {
+              const end = new Date()
+              const start = new Date()
+              start.setMonth(start.getMonth() - 3)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '本年',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(0)
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '重置',
+            onClick(picker) {
+              picker.$emit('pick', [])
+            }
+          }
+        ]
+      }
+    }
+  },
+
   computed: {
     activeFilterCount() {
       let count = 0
@@ -168,7 +236,13 @@ export default {
         const val = this.filterValues[key]
         if (val === null || val === undefined || val === '') return
         if (typeof val === 'object' && !Array.isArray(val)) {
-          if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) count++
+          if (val.operator !== undefined) {
+            if (val.value !== '' && val.value !== null && val.value !== undefined) count++
+          } else if (val.range !== undefined) {
+            if (Array.isArray(val.range) && val.range.length === 2) count++
+          } else if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) {
+            count++
+          }
         } else if (Array.isArray(val)) {
           if (val.length > 0) count++
         } else {
@@ -191,7 +265,7 @@ export default {
 
   methods: {
     isRangeType(fieldType) {
-      return fieldType === 'date' || fieldType === 'number' || fieldType === 'currency'
+      return fieldType === 'date' || fieldType === 'number' || fieldType === 'currency' || fieldType === 'string'
     },
     hasEnumOptions(meta) {
       return meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
@@ -315,8 +389,9 @@ export default {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, 380px);
   gap: 8px 16px;
+  justify-content: center;
 }
 .filter-grid-item {
   display: flex;
@@ -324,15 +399,14 @@ export default {
   min-width: 0;
   margin-bottom: 4px;
 }
-.filter-grid-item--wide {
-  grid-column: span 2;
-}
 .filter-label {
   flex-shrink: 0;
   font-size: 13px;
   color: #606266;
   margin-right: 8px;
   white-space: nowrap;
+  width: 60px;
+  text-align: right;
 }
 .filter-control {
   flex: 1;
@@ -343,18 +417,14 @@ export default {
 .filter-control .el-date-editor {
   width: 100%;
 }
-.range-input {
+.compare-input {
   display: flex;
   align-items: center;
+  gap: 4px;
   width: 100%;
 }
-.range-input .el-input {
+.compare-input .el-input {
   flex: 1;
-}
-.range-separator {
-  margin: 0 4px;
-  color: #c0c4cc;
-  flex-shrink: 0;
 }
 .filter-actions {
   display: flex;

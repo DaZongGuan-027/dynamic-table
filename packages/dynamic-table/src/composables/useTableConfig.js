@@ -1,7 +1,7 @@
 export default {
   props: {
     menuId: { type: String, required: true },
-    userId: { type: String, required: true },
+
     fieldMetaList: { type: Array, required: true },
     loadConfigFn: { type: Function, default: null },
     saveConfigFn: { type: Function, default: null }
@@ -16,7 +16,8 @@ export default {
       frozenPositions: {},
       filterFields: [],
       columnOrder: [],
-      filterSchemes: []
+      filterSchemes: [],
+      columnWidths: {}
     }
   },
 
@@ -57,7 +58,7 @@ export default {
       }
       this.configLoading = true
       try {
-        const config = await this.loadConfigFn(this.menuId, this.userId)
+          const config = await this.loadConfigFn(this.menuId)
         if (config) {
           this.config = config
           this.visibleFields = this._parseJsonField(config.visibleFields) || this.fieldMetaList.map(f => f.fieldKey)
@@ -66,6 +67,7 @@ export default {
           this.filterFields = this._parseJsonField(config.filterFields) || []
           this.columnOrder = this._parseJsonField(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
           this.filterSchemes = this._parseJsonField(config.filterSchemes) || []
+          this.columnWidths = this._parseJsonField(config.columnWidths) || {}
         } else {
           this.resetToDefault()
         }
@@ -91,6 +93,19 @@ export default {
       this.filterFields = []
       this.columnOrder = this.fieldMetaList.map(f => f.fieldKey)
       this.filterSchemes = []
+      this.columnWidths = {}
+    },
+
+    clearStorageConfig() {
+      const key = 'dynamic_table_config_' + this.menuId
+      const keysToRemove = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith(key)) {
+          keysToRemove.push(k)
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k))
     },
 
     async saveConfig() {
@@ -111,24 +126,31 @@ export default {
     _buildConfig() {
       return {
         menuId: this.menuId,
-        userId: this.userId,
+
         visibleFields: JSON.stringify(this.visibleFields),
         frozenFields: JSON.stringify(this.frozenFields),
         frozenPositions: JSON.stringify(this.frozenPositions),
         filterFields: JSON.stringify(this.filterFields),
         columnOrder: JSON.stringify(this.columnOrder),
-        filterSchemes: JSON.stringify(this.filterSchemes)
+        filterSchemes: JSON.stringify(this.filterSchemes),
+        columnWidths: JSON.stringify(this.columnWidths)
       }
     },
 
-    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, filterFields, filterSchemes }) {
+    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes }) {
       this.visibleFields = visibleFields
       this.columnOrder = columnOrder
       this.frozenFields = frozenFields
       this.frozenPositions = frozenPositions || {}
+      this.columnWidths = columnWidths || {}
       this.filterFields = filterFields
       this.filterSchemes = filterSchemes
       this.saveConfig()
+      this.tableKey++
+      this.$nextTick(() => {
+        this.calcTableHeight()
+        this.fetchData()
+      })
     },
 
     handleApplyScheme(filterValues) {

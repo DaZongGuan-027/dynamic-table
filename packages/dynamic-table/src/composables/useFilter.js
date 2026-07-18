@@ -13,8 +13,18 @@ export default {
         const val = this.filterValues[key]
         if (val === null || val === undefined || val === '') return
         if (typeof val === 'object' && !Array.isArray(val)) {
-          const hasValue = Object.values(val).some(v => v !== null && v !== undefined && v !== '')
-          if (hasValue) filters[key] = val
+          if (val.range !== undefined) {
+            if (Array.isArray(val.range) && val.range.length === 2) {
+              filters[key] = {
+                start: val.range[0] + ' 00:00:00',
+                end: val.range[1] + ' 23:59:59'
+              }
+            }
+          } else if (val.operator !== undefined) {
+            if (val.value !== '' && val.value !== null && val.value !== undefined) filters[key] = val
+          } else if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) {
+            filters[key] = val
+          }
         } else if (Array.isArray(val)) {
           if (val.length > 0) filters[key] = val
         } else {
@@ -34,18 +44,21 @@ export default {
           values[meta.fieldKey] = []
         } else {
           switch (meta.fieldType) {
+            case 'string':
+              values[meta.fieldKey] = { operator: 'contains', value: '' }
+              break
             case 'number':
             case 'currency':
-              values[meta.fieldKey] = { min: '', max: '' }
+              values[meta.fieldKey] = { operator: 'eq', value: '' }
               break
             case 'date':
-              values[meta.fieldKey] = { start: '', end: '' }
+              values[meta.fieldKey] = { range: null }
               break
             case 'boolean':
               values[meta.fieldKey] = ''
               break
             default:
-              values[meta.fieldKey] = ''
+              values[meta.fieldKey] = { operator: 'contains', value: '' }
           }
         }
       })

@@ -1,15 +1,13 @@
 <template>
   <dynamic-table
     menu-id="M001"
-    :user-id="userId"
+
     :field-meta-list="fieldMetaList"
     :fetch-data-fn="fetchDataFn"
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
     row-key="id"
-    :show-selection="true"
-    :show-index="true"
-    :row-actions="actions"
+
     @selection-change="handleSelectionChange"
     @row-action="handleRowAction"
   >
@@ -33,7 +31,7 @@
 </template>
 
 <script>
-import DynamicTable from '../components/DynamicTable/index.vue'
+import DynamicTable from '../../packages/dynamic-table/src/index.vue'
 import { getTableData, getTableConfig, saveTableConfig } from '../mock/api'
 
 export default {
@@ -43,15 +41,12 @@ export default {
 
   data() {
     return {
-      userId: 'U10001',
+
       selectedRows: [],
-      actions: [
-        { label: '查看', action: 'view' },
-        { label: '编辑', action: 'edit' },
-        { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
-      ],
 
       fieldMetaList: [
+        { fieldKey: '__selection', fieldLabel: '选择框', fieldType: 'selection', width: 50 },
+        { fieldKey: '__index', fieldLabel: '序号', fieldType: 'index', width: 50 },
         { fieldKey: 'username', fieldLabel: '用户名', fieldType: 'string', filterable: true, sortable: true, width: 120, align: 'left' },
         { fieldKey: 'age', fieldLabel: '年龄', fieldType: 'number', filterable: true, sortable: true, width: 80, align: 'center' },
         { fieldKey: 'status', fieldLabel: '状态', fieldType: 'enum', filterable: true, sortable: true, width: 100, align: 'center', enumValues: [{ label: '启用', value: 1 }, { label: '禁用', value: 0 }] },
@@ -60,7 +55,12 @@ export default {
         { fieldKey: 'role', fieldLabel: '角色', fieldType: 'enum', filterable: true, sortable: true, width: 120, align: 'center', enumValues: [{ label: '管理员', value: 'admin' }, { label: '普通用户', value: 'user' }] },
         { fieldKey: 'department', fieldLabel: '部门', fieldType: 'enum', filterable: true, sortable: true, width: 120, align: 'center', enumValues: [{ label: '技术部', value: '技术部' }, { label: '市场部', value: '市场部' }, { label: '人事部', value: '人事部' }, { label: '财务部', value: '财务部' }, { label: '运营部', value: '运营部' }, { label: '管理层', value: '管理层' }] },
         { fieldKey: 'phone', fieldLabel: '手机号', fieldType: 'string', filterable: true, sortable: false, width: 130, align: 'center' },
-        { fieldKey: 'createTime', fieldLabel: '创建时间', fieldType: 'date', filterable: true, sortable: true, width: 170, align: 'center' }
+        { fieldKey: 'createTime', fieldLabel: '创建时间', fieldType: 'date', filterable: true, sortable: true, width: 170, align: 'center' },
+        { fieldKey: '__actions', fieldLabel: '操作', fieldType: 'actions', width: 150, actions: [
+          { label: '查看', action: 'view' },
+          { label: '编辑', action: 'edit' },
+          { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
+        ]}
       ]
     }
   },
@@ -70,8 +70,8 @@ export default {
       return getTableData(params)
     },
 
-    loadConfigFn(menuId, userId) {
-      return getTableConfig(menuId, userId)
+    loadConfigFn(menuId) {
+      return getTableConfig(menuId)
     },
 
     saveConfigFn(config) {

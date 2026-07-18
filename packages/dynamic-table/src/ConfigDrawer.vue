@@ -3,13 +3,13 @@
     title="表格配置"
     :visible.sync="drawerVisible"
     direction="rtl"
-    size="420px"
+    size="480px"
     :before-close="handleClose"
     append-to-body
     custom-class="config-drawer"
   >
     <el-tabs v-model="activeTab" class="config-tabs">
-      <el-tab-pane label="列配置" name="column">
+      <el-tab-pane label="表头配置" name="column">
         <div class="tab-tip">
           <i class="el-icon-info"></i>
           勾选展示列，锁定图标设置冻结列，拖拽调整顺序
@@ -39,6 +39,16 @@
           >
             <el-checkbox v-model="item.visible" class="column-visible-check" @change="handleVisibleChange(item)">{{ item.fieldLabel }}</el-checkbox>
             <div class="config-item-right">
+              <el-input-number
+
+                v-model="item.width"
+                size="mini"
+                :min="50"
+                :step="10"
+                controls-position="right"
+                class="width-input"
+                @change="handleWidthChange(item)"
+              />
               <el-tooltip content="冻结到左侧" placement="top" :open-delay="300">
                 <i
                   class="freeze-icon freeze-left"
@@ -53,7 +63,9 @@
                   @click="item.visible && handleFreezeRight(item)"
                 >▶</i>
               </el-tooltip>
-              <i class="el-icon-rank drag-handle"></i>
+              <el-tooltip content="拖拽排序" placement="top" :open-delay="300">
+                <i class="el-icon-rank drag-handle"></i>
+              </el-tooltip>
             </div>
           </div>
         </draggable>
@@ -87,17 +99,16 @@
               <span class="field-type-tag">{{ fieldTypeLabel(item.fieldType) }}</span>
             </el-checkbox>
             <div class="config-item-right">
-              <i class="el-icon-rank drag-handle"></i>
+              <el-tooltip content="拖拽排序" placement="top" :open-delay="300">
+                <i class="el-icon-rank drag-handle"></i>
+              </el-tooltip>
             </div>
           </div>
         </draggable>
       </el-tab-pane>
 
       <el-tab-pane label="筛选方案" name="scheme">
-        <div class="tab-tip">
-          <i class="el-icon-info"></i>
-          管理已保存的筛选方案。新增方案请在筛选面板中点击"保存为方案"按钮。
-        </div>
+
         <div class="scheme-list">
           <div
             v-for="(scheme, index) in editSchemes"
@@ -152,8 +163,11 @@
     </el-tabs>
 
     <div class="drawer-footer">
-      <el-button @click="handleClose" size="small">取 消</el-button>
-      <el-button type="primary" @click="handleConfirm" size="small">保 存</el-button>
+      <el-button size="small" @click="handleResetDefault">还原默认</el-button>
+      <div class="footer-right">
+        <el-button @click="handleClose" size="small">取 消</el-button>
+        <el-button type="primary" @click="handleConfirm" size="small">保 存</el-button>
+      </div>
     </div>
   </el-drawer>
 </template>
@@ -172,13 +186,23 @@ export default {
     visibleFields: { type: Array, default: () => [] },
     frozenFields: { type: Array, default: () => [] },
     frozenPositions: { type: Object, default: () => ({}) },
+    columnWidths: { type: Object, default: () => ({}) },
     filterFields: { type: Array, default: () => [] },
     columnOrder: { type: Array, default: () => [] },
     filterSchemes: { type: Array, default: () => [] },
-    currentFilterValues: { type: Object, default: () => ({}) },
-    showSelection: { type: Boolean, default: false },
-    showIndex: { type: Boolean, default: false },
-    showActions: { type: Boolean, default: false }
+    currentFilterValues: { type: Object, default: () => ({}) }
+  },
+
+  computed: {
+    showSelection() {
+      return this.fieldMetaList.some(f => f.fieldType === 'selection')
+    },
+    showIndex() {
+      return this.fieldMetaList.some(f => f.fieldType === 'index')
+    },
+    showActions() {
+      return this.fieldMetaList.some(f => f.fieldType === 'actions')
+    }
   },
 
   data() {
@@ -270,45 +294,27 @@ export default {
       const allKeys = [...orderedKeys, ...extraKeys]
 
       const columnList = []
-      if (this.showSelection) {
-        columnList.unshift({
-          fieldKey: '__selection',
-          fieldLabel: '选择框',
-          visible: true,
-          frozenPosition: this.frozenFields.includes('__selection') ? 'left' : '',
-          isSpecial: true
-        })
-      }
-      if (this.showIndex) {
-        columnList.unshift({
-          fieldKey: '__index',
-          fieldLabel: '序号',
-          visible: true,
-          frozenPosition: this.frozenFields.includes('__index') ? 'left' : '',
-          isSpecial: true
-        })
-      }
-      if (this.showActions) {
-        columnList.push({
-          fieldKey: '__actions',
-          fieldLabel: '操作',
-          visible: true,
-          frozenPosition: this.frozenFields.includes('__actions') ? (this.frozenPositions['__actions'] || 'right') : '',
-          isSpecial: true
-        })
-      }
       allKeys.forEach(key => {
         const meta = this.fieldMetaList.find(f => f.fieldKey === key)
+        if (!meta) return
+        const isSpecial = ['selection', 'index', 'actions'].includes(meta.fieldType)
         let frozenPosition = ''
-        if (this.frozenFields.includes(key)) {
+        if (isSpecial) {
+          if (this.frozenFields.includes(key)) {
+            frozenPosition = key === '__actions' ? (this.frozenPositions[key] || 'right') : 'left'
+          } else if (meta.frozenPosition) {
+            frozenPosition = meta.frozenPosition
+          }
+        } else if (this.frozenFields.includes(key)) {
           frozenPosition = (meta && meta.frozenPosition === 'right') ? 'right' : 'left'
         }
         columnList.push({
           fieldKey: key,
-          fieldLabel: meta ? meta.fieldLabel : key,
-          visible: this.visibleFields.includes(key),
+          fieldLabel: meta.fieldLabel,
+          visible: this.visibleFields.length > 0 ? this.visibleFields.includes(key) : true,
           frozenPosition,
-          isSpecial: false
+          isSpecial,
+          width: this.columnWidths[key] || meta.width || (isSpecial ? (key === '__actions' ? 150 : 50) : 120)
         })
       })
       this.editColumnList = columnList
@@ -366,6 +372,10 @@ export default {
         item.visible = val
         if (!val) item.frozenPosition = ''
       })
+    },
+
+    handleWidthChange(item) {
+      if (item.width < 50) item.width = 50
     },
 
     handleFreezeLeft(item) {
@@ -450,6 +460,13 @@ export default {
 
         if (typeof val === 'object' && !Array.isArray(val)) {
           const subParts = []
+          if (val.operator !== undefined && val.value !== '' && val.value !== null && val.value !== undefined) {
+            const opMap = { eq: '=', gt: '>', lt: '<', gte: '≥', lte: '≤', contains: '包含', notContains: '不包含' }
+            subParts.push((opMap[val.operator] || val.operator) + val.value)
+          }
+          if (val.range && Array.isArray(val.range) && val.range.length === 2) {
+            subParts.push(val.range[0] + '至' + val.range[1])
+          }
           if (val.min !== '' && val.min !== null && val.min !== undefined) subParts.push('≥' + val.min)
           if (val.max !== '' && val.max !== null && val.max !== undefined) subParts.push('≤' + val.max)
           if (val.start) subParts.push('从' + val.start)
@@ -473,8 +490,8 @@ export default {
     },
 
     handleConfirm() {
-      const visibleFields = this.editColumnList.filter(i => i.visible && !i.isSpecial).map(i => i.fieldKey)
-      const columnOrder = this.editColumnList.filter(i => !i.isSpecial).map(i => i.fieldKey)
+      const visibleFields = this.editColumnList.filter(i => i.visible).map(i => i.fieldKey)
+      const columnOrder = this.editColumnList.map(i => i.fieldKey)
       const frozenFields = this.editColumnList.filter(i => i.visible && i.frozenPosition).map(i => i.fieldKey)
       const frozenPositions = {}
       this.editColumnList.filter(i => i.visible && i.frozenPosition).forEach(i => {
@@ -486,11 +503,17 @@ export default {
         filterValues: s.filterValues
       }))
 
+      const columnWidths = {}
+      this.editColumnList.forEach(i => {
+        if (i.width) columnWidths[i.fieldKey] = i.width
+      })
+
       this.$emit('confirm', {
         visibleFields,
         columnOrder,
         frozenFields,
         frozenPositions,
+        columnWidths,
         filterFields,
         filterSchemes
       })
@@ -499,6 +522,17 @@ export default {
 
     handleClose() {
       this.drawerVisible = false
+    },
+
+    handleResetDefault() {
+      this.$confirm('确定还原为默认配置？所有自定义配置（表头配置、筛选配置、筛选方案）将被清除，且不可恢复。', '还原默认配置', {
+        confirmButtonText: '确定还原',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.$emit('reset-default')
+        this.drawerVisible = false
+      }).catch(() => {})
     }
   }
 }
@@ -509,14 +543,19 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100%;
 }
 .config-tabs {
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0 16px;
 }
 .config-tabs .el-tabs__content {
-  padding-bottom: 80px;
+  padding-bottom: 60px;
+}
+.config-tabs .el-tab-pane {
+  padding-bottom: 60px;
 }
 .tab-tip {
   font-size: 12px;
@@ -553,6 +592,13 @@ export default {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.width-input {
+  width: 100px;
+}
+.width-input .el-input__inner {
+  padding-left: 8px;
+  padding-right: 28px;
 }
 .freeze-icon {
   font-size: 12px;
@@ -667,7 +713,14 @@ export default {
   padding: 12px 16px;
   background: #fff;
   border-top: 1px solid #ebeef5;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   z-index: 10;
+}
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

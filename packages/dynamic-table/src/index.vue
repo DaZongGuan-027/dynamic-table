@@ -33,6 +33,7 @@
 
     <el-table
       ref="elTable"
+      :key="tableKey"
       :data="tableData"
       :border="border"
       :stripe="stripe"
@@ -43,34 +44,56 @@
       @selection-change="handleSelectionChange"
       style="width: 100%"
     >
-      <el-table-column
-        v-if="showSelection"
-        type="selection"
-        width="50"
-        :fixed="getFrozenFixed('__selection')"
-        :header-align="headerAlign"
-        align="center"
-      />
-
-      <el-table-column
-        v-if="showIndex"
-        type="index"
-        label="#"
-        width="50"
-        :fixed="getFrozenFixed('__index')"
-        :header-align="headerAlign"
-        align="center"
-      />
-
-      <template v-for="fieldKey in frozenLeftColumns">
+      <template v-for="fieldKey in allColumnOrder">
         <el-table-column
-          :key="'frozen-left-' + fieldKey"
+          v-if="fieldKey === '__selection' && hasSelection && isSpecialVisible('__selection')"
+          :key="fieldKey"
+          type="selection"
+          :width="columnWidths['__selection'] || 50"
+          :fixed="getFrozenFixed('__selection')"
+          :header-align="headerAlign"
+          align="center"
+        />
+        <el-table-column
+          v-else-if="fieldKey === '__index' && hasIndex && isSpecialVisible('__index')"
+          :key="fieldKey"
+          type="index"
+          label="#"
+          :width="columnWidths['__index'] || 50"
+          :fixed="getFrozenFixed('__index')"
+          :header-align="headerAlign"
+          align="center"
+        />
+        <el-table-column
+          v-else-if="fieldKey === '__actions' && hasRowActions && isSpecialVisible('__actions')"
+          :key="fieldKey"
+          label="操作"
+          :width="columnWidths['__actions'] || actionColumnWidth"
+          :fixed="getActionColumnFixed"
+          :header-align="headerAlign"
+          align="center"
+        >
+          <template slot-scope="scope">
+            <template v-for="(action, idx) in getRowActions">
+              <el-button
+                :key="idx"
+                type="text"
+                size="mini"
+                :style="action.style || {}"
+                @click="handleRowAction(action, scope.row)"
+              >{{ action.label }}</el-button>
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-else-if="isDataField(fieldKey) && orderedVisibleFields.includes(fieldKey)"
+          :key="fieldKey"
           :prop="fieldKey"
-          :width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined"
+          :width="columnWidths[fieldKey] || (fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined)"
           :min-width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined"
           :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
           :header-align="headerAlign"
-          fixed="left"
+          :fixed="getFrozenFixed(fieldKey)"
           show-overflow-tooltip
         >
           <template slot="header">
@@ -96,96 +119,6 @@
           </template>
         </el-table-column>
       </template>
-
-      <template v-for="fieldKey in normalColumns">
-        <el-table-column
-          :key="'normal-' + fieldKey"
-          :prop="fieldKey"
-          :width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined"
-          :min-width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined"
-          :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
-          :header-align="headerAlign"
-          show-overflow-tooltip
-        >
-          <template slot="header">
-            <column-header
-              :field-key="fieldKey"
-              :field-meta="fieldMetaMap[fieldKey]"
-              :column-search-value="columnSearchValues[fieldKey]"
-              :current-sort-order="currentSortBy === fieldKey ? currentSortOrder : ''"
-              @sort-change="handleColumnSortChange"
-              @search-change="handleColumnSearchChange"
-              @search-confirm="handleColumnSearchConfirm"
-              @search-clear="handleColumnSearchClear"
-            />
-          </template>
-          <template slot-scope="scope">
-            <slot
-              :name="'column-' + fieldKey"
-              :row="scope.row"
-              :value="scope.row[fieldKey]"
-            >
-              {{ formatCellValue(scope.row[fieldKey], fieldMetaMap[fieldKey]) }}
-            </slot>
-          </template>
-        </el-table-column>
-      </template>
-
-      <template v-for="fieldKey in frozenRightColumns">
-        <el-table-column
-          :key="'frozen-right-' + fieldKey"
-          :prop="fieldKey"
-          :width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined"
-          :min-width="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined"
-          :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
-          :header-align="headerAlign"
-          fixed="right"
-          show-overflow-tooltip
-        >
-          <template slot="header">
-            <column-header
-              :field-key="fieldKey"
-              :field-meta="fieldMetaMap[fieldKey]"
-              :column-search-value="columnSearchValues[fieldKey]"
-              :current-sort-order="currentSortBy === fieldKey ? currentSortOrder : ''"
-              @sort-change="handleColumnSortChange"
-              @search-change="handleColumnSearchChange"
-              @search-confirm="handleColumnSearchConfirm"
-              @search-clear="handleColumnSearchClear"
-            />
-          </template>
-          <template slot-scope="scope">
-            <slot
-              :name="'column-' + fieldKey"
-              :row="scope.row"
-              :value="scope.row[fieldKey]"
-            >
-              {{ formatCellValue(scope.row[fieldKey], fieldMetaMap[fieldKey]) }}
-            </slot>
-          </template>
-        </el-table-column>
-      </template>
-
-      <el-table-column
-        v-if="hasRowActions"
-        label="操作"
-        :width="actionColumnWidth"
-        :fixed="getActionColumnFixed"
-        :header-align="headerAlign"
-        align="center"
-      >
-        <template slot-scope="scope">
-          <template v-for="(action, idx) in rowActions">
-            <el-button
-              :key="idx"
-              type="text"
-              size="mini"
-              :style="action.style || {}"
-              @click="handleRowAction(action, scope.row)"
-            >{{ action.label }}</el-button>
-          </template>
-        </template>
-      </el-table-column>
     </el-table>
 
     <div class="table-pagination" v-if="showPagination">
@@ -206,14 +139,14 @@
       :visible-fields="visibleFields"
       :frozen-fields="frozenFields"
       :frozen-positions="frozenPositions"
+      :column-widths="columnWidths"
       :filter-fields="filterFields"
       :column-order="columnOrder"
       :filter-schemes="filterSchemes"
       :current-filter-values="filterValues"
-      :show-selection="showSelection"
-      :show-index="showIndex"
-      :show-actions="hasRowActions"
+
       @confirm="handleConfigChange"
+      @reset-default="handleResetDefault"
     />
   </div>
 </template>
@@ -238,7 +171,7 @@ export default {
 
   props: {
     menuId: { type: String, required: true },
-    userId: { type: String, required: true },
+
     fieldMetaList: { type: Array, required: true },
     fetchDataFn: { type: Function, required: true },
     loadConfigFn: { type: Function, default: null },
@@ -248,12 +181,11 @@ export default {
     stripe: { type: Boolean, default: true },
     tableHeight: { type: [String, Number], default: undefined },
     maxHeight: { type: [String, Number], default: undefined },
-    showSelection: { type: Boolean, default: false },
-    showIndex: { type: Boolean, default: false },
+
     showPagination: { type: Boolean, default: true },
     pageSizes: { type: Array, default: () => [10, 20, 50, 100] },
     headerAlign: { type: String, default: 'center' },
-    rowActions: { type: Array, default: () => [] },
+
     actionColumnWidth: { type: [String, Number], default: 150 }
   },
 
@@ -262,6 +194,7 @@ export default {
       showConfigDrawer: false,
       tableData: [],
       tableLoading: false,
+      tableKey: 0,
       total: 0,
       currentPage: 1,
       pageSize: 10,
@@ -280,7 +213,36 @@ export default {
     },
 
     hasRowActions() {
-      return this.rowActions && this.rowActions.length > 0
+      return this.fieldMetaList.some(f => f.fieldType === 'actions')
+    },
+
+    hasSelection() {
+      return this.fieldMetaList.some(f => f.fieldType === 'selection')
+    },
+
+    hasIndex() {
+      return this.fieldMetaList.some(f => f.fieldType === 'index')
+    },
+
+    getRowActions() {
+      const actionsMeta = this.fieldMetaList.find(f => f.fieldType === 'actions')
+      return actionsMeta && actionsMeta.actions ? actionsMeta.actions : []
+    },
+
+    specialKeys() {
+      const keys = []
+      if (this.fieldMetaList.some(f => f.fieldType === 'selection')) keys.push('__selection')
+      if (this.fieldMetaList.some(f => f.fieldType === 'index')) keys.push('__index')
+      if (this.hasRowActions) keys.push('__actions')
+      return keys
+    },
+
+    allColumnOrder() {
+      const specialInOrder = this.columnOrder.filter(k => k.startsWith('__'))
+      const specialNotInOrder = this.specialKeys.filter(k => !specialInOrder.includes(k))
+      const prefixSpecials = specialNotInOrder.filter(k => k !== '__actions')
+      const suffixSpecials = specialNotInOrder.filter(k => k === '__actions')
+      return [...prefixSpecials, ...this.columnOrder, ...suffixSpecials]
     },
 
     getActionColumnFixed() {
@@ -380,6 +342,16 @@ export default {
       return value
     },
 
+    isSpecialVisible(key) {
+      if (this.visibleFields.includes(key)) return true
+      if (!this.columnOrder.includes(key) && !this.visibleFields.includes(key)) return true
+      return false
+    },
+
+    isDataField(key) {
+      return !key.startsWith('__')
+    },
+
     _formatCurrency(value) {
       const num = Number(value)
       if (isNaN(num)) return value
@@ -422,6 +394,23 @@ export default {
 
     handleSelectionChange(selection) {
       this.$emit('selection-change', selection)
+    },
+
+    handleResetDefault() {
+      this.resetToDefault()
+      this.clearStorageConfig()
+      this.initFilterValues()
+      this.columnSearchValues = {}
+      this.currentSortBy = ''
+      this.currentSortOrder = ''
+      this.activeSchemeIndex = -1
+      this.currentPage = 1
+      this.tableKey++
+      this.$nextTick(() => {
+        this.calcTableHeight()
+        this.fetchData()
+      })
+      this.$message.success('已还原为默认配置')
     },
 
     applyFilters() {
@@ -608,6 +597,8 @@ export default {
 .dynamic-table >>> .el-table th {
   background: #ecf5ff;
 }
+
+
 .table-toolbar {
   display: flex;
   align-items: flex-end;
