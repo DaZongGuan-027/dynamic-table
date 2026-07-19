@@ -1,6 +1,6 @@
 {
   "name": "dynamic-table-vue2-element",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "基于 Vue2 + Element UI 的动态配置表格组件",
   "main": "lib/dynamic-table.umd.js",
   "module": "lib/dynamic-table.esm.js",

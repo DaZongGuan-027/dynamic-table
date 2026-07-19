@@ -306,7 +306,7 @@ export default {
             frozenPosition = meta.frozenPosition
           }
         } else if (this.frozenFields.includes(key)) {
-          frozenPosition = (meta && meta.frozenPosition === 'right') ? 'right' : 'left'
+          frozenPosition = this.frozenPositions[key] || (meta && meta.frozenPosition === 'right' ? 'right' : 'left')
         }
         columnList.push({
           fieldKey: key,

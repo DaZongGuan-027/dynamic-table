@@ -242,6 +242,12 @@ export default {
       const specialNotInOrder = this.specialKeys.filter(k => !specialInOrder.includes(k))
       const prefixSpecials = specialNotInOrder.filter(k => k !== '__actions')
       const suffixSpecials = specialNotInOrder.filter(k => k === '__actions')
+      const hasLeftFrozen = this.frozenLeftColumns.length > 0
+      const unfrozenPrefix = prefixSpecials.filter(k => !this.frozenFields.includes(k))
+      const frozenPrefix = prefixSpecials.filter(k => this.frozenFields.includes(k))
+      if (hasLeftFrozen) {
+        return [...frozenPrefix, ...this.columnOrder, ...unfrozenPrefix, ...suffixSpecials]
+      }
       return [...prefixSpecials, ...this.columnOrder, ...suffixSpecials]
     },
 
