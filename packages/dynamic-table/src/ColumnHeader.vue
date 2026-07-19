@@ -206,6 +206,17 @@ export default {
     }
   },
 
+  watch: {
+    popoverVisible(val) {
+      if (val) {
+        this.$nextTick(() => {
+          this.showSearch = this.hasSearchValue
+          this.initSearchValue()
+        })
+      }
+    }
+  },
+
   computed: {
     currentSort() {
       return this.currentSortOrder || ''
@@ -226,6 +237,12 @@ export default {
     hasSearchValue() {
       if (this.columnSearchValue === null || this.columnSearchValue === undefined) return false
       if (typeof this.columnSearchValue === 'object' && !Array.isArray(this.columnSearchValue)) {
+        if (this.columnSearchValue.value !== undefined) {
+          return this.columnSearchValue.value !== null && this.columnSearchValue.value !== undefined && this.columnSearchValue.value !== ''
+        }
+        if (this.columnSearchValue.range !== undefined) {
+          return Array.isArray(this.columnSearchValue.range) && this.columnSearchValue.range.length > 0
+        }
         return Object.keys(this.columnSearchValue).some(
           k => this.columnSearchValue[k] !== null && this.columnSearchValue[k] !== undefined && this.columnSearchValue[k] !== ''
         )
@@ -269,11 +286,11 @@ export default {
         this.searchValue = Array.isArray(saved) ? [...saved] : []
       } else if (meta.fieldType === 'string' || !meta.fieldType) {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
-          ? { operator: saved.operator || 'contains', value: saved.value || '' }
+          ? { operator: saved.operator || 'contains', value: saved.value != null ? saved.value : '' }
           : { operator: 'contains', value: '' }
       } else if (meta.fieldType === 'number' || meta.fieldType === 'currency') {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
-          ? { operator: saved.operator || 'eq', value: saved.value || '' }
+          ? { operator: saved.operator || 'eq', value: saved.value != null ? saved.value : '' }
           : { operator: 'eq', value: '' }
       } else if (meta.fieldType === 'date') {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
