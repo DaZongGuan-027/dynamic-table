@@ -445,7 +445,7 @@ export default {
             const val = schemeFilterValues[key]
             if (val !== null && val !== undefined && val !== '') {
               if (typeof val === 'object' && !Array.isArray(val)) {
-                if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) {
+                if (Object.keys(val).some(function(k) { return val[k] !== null && val[k] !== undefined && val[k] !== '' })) {
                   newColumnSearch[key] = JSON.parse(JSON.stringify(val))
                 }
               } else if (Array.isArray(val)) {
@@ -483,7 +483,7 @@ export default {
         const val = this.filterValues[key]
         if (val !== null && val !== undefined && val !== '') {
           if (typeof val === 'object' && !Array.isArray(val)) {
-            if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) {
+            if (Object.keys(val).some(function(k) { return val[k] !== null && val[k] !== undefined && val[k] !== '' })) {
               merged[key] = JSON.parse(JSON.stringify(val))
             }
           } else if (Array.isArray(val)) {
@@ -497,7 +497,7 @@ export default {
         const val = this.columnSearchValues[key]
         if (val !== null && val !== undefined && val !== '') {
           if (typeof val === 'object' && !Array.isArray(val)) {
-            if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) {
+            if (Object.keys(val).some(function(k) { return val[k] !== null && val[k] !== undefined && val[k] !== '' })) {
               merged[key] = JSON.parse(JSON.stringify(val))
             }
           } else if (Array.isArray(val)) {

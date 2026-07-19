@@ -226,8 +226,8 @@ export default {
     hasSearchValue() {
       if (this.columnSearchValue === null || this.columnSearchValue === undefined) return false
       if (typeof this.columnSearchValue === 'object' && !Array.isArray(this.columnSearchValue)) {
-        return Object.values(this.columnSearchValue).some(
-          v => v !== null && v !== undefined && v !== ''
+        return Object.keys(this.columnSearchValue).some(
+          k => this.columnSearchValue[k] !== null && this.columnSearchValue[k] !== undefined && this.columnSearchValue[k] !== ''
         )
       }
       if (Array.isArray(this.columnSearchValue)) return this.columnSearchValue.length > 0

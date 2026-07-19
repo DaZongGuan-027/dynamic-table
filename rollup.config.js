@@ -14,13 +14,13 @@ export default {
     {
       file: 'lib/dynamic-table.esm.js',
       format: 'esm',
-      sourcemap: true
+      sourcemap: false
     },
     {
       file: 'lib/dynamic-table.umd.js',
       format: 'umd',
       name: 'DynamicTable',
-      sourcemap: true,
+      sourcemap: false,
       globals: {
         vue: 'Vue',
         'element-ui': 'ELEMENT',
@@ -38,7 +38,10 @@ export default {
       babelHelpers: 'bundled',
       exclude: 'node_modules/**',
       presets: [
-        ['@babel/preset-env', { modules: false }]
+        ['@babel/preset-env', {
+          modules: false,
+          targets: 'ie >= 9, chrome >= 49, firefox >= 52, safari >= 10, node >= 6'
+        }]
       ]
     }),
     vue({

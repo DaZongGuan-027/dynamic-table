@@ -22,7 +22,7 @@ export default {
             }
           } else if (val.operator !== undefined) {
             if (val.value !== '' && val.value !== null && val.value !== undefined) filters[key] = val
-          } else if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) {
+          } else if (Object.keys(val).some(k => val[k] !== null && val[k] !== undefined && val[k] !== '')) {
             filters[key] = val
           }
         } else if (Array.isArray(val)) {

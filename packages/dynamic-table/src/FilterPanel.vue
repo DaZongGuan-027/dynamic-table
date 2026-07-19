@@ -240,7 +240,7 @@ export default {
             if (val.value !== '' && val.value !== null && val.value !== undefined) count++
           } else if (val.range !== undefined) {
             if (Array.isArray(val.range) && val.range.length === 2) count++
-          } else if (Object.values(val).some(v => v !== null && v !== undefined && v !== '')) {
+          } else if (Object.keys(val).some(k => val[k] !== null && val[k] !== undefined && val[k] !== '')) {
             count++
           }
         } else if (Array.isArray(val)) {

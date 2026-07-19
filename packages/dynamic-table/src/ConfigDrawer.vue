@@ -442,7 +442,7 @@ export default {
         const val = filterValues[key]
         if (val === null || val === undefined || val === '') return false
         if (typeof val === 'object' && !Array.isArray(val)) {
-          return Object.values(val).some(v => v !== null && v !== undefined && v !== '')
+          return Object.keys(val).some(k => val[k] !== null && val[k] !== undefined && val[k] !== '')
         }
         if (Array.isArray(val)) return val.length > 0
         return true
