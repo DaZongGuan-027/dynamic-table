@@ -46,9 +46,6 @@ export default {
     }
   },
 
-  created() {
-    this.loadConfig()
-  },
 
   methods: {
     async loadConfig() {
