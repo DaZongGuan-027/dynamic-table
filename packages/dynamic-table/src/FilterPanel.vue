@@ -389,9 +389,8 @@ export default {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 380px);
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 8px 16px;
-  justify-content: center;
 }
 .filter-grid-item {
   display: flex;
