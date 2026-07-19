@@ -62,8 +62,8 @@
             <el-option label="不等于" value="neq" />
             <el-option label="包含" value="contains" />
             <el-option label="不包含" value="notContains" />
-            <el-option label="大于" value="gt" />
-            <el-option label="小于" value="lt" />
+            <el-option label="开头是" value="startsWith" />
+            <el-option label="结尾是" value="endsWith" />
           </el-select>
           <el-input
             v-model="searchValue.value"

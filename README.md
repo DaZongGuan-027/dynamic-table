@@ -256,13 +256,15 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | 操作符值 | 含义 | 适用类型 |
 |----------|------|----------|
 | eq | 等于 | string, number, currency |
-| neq | 不等于 | string |
-| gt | 大于 | string, number, currency |
-| lt | 小于 | string, number, currency |
-| gte | 大于等于 | number, currency |
-| lte | 小于等于 | number, currency |
+| neq | 不等于 | string, number, currency |
 | contains | 包含 | string, number, currency |
 | notContains | 不包含 | string, number, currency |
+| startsWith | 开头是 | string |
+| endsWith | 结尾是 | string |
+| gt | 大于 | number, currency |
+| lt | 小于 | number, currency |
+| gte | 大于等于 | number, currency |
+| lte | 小于等于 | number, currency |
 
 > 字符串类型默认操作符为 `contains`，数值/金额类型默认操作符为 `eq`
 
@@ -483,8 +485,8 @@ CREATE TABLE t_table_config (
 
 | 字段类型 | filters 结构 | 后端处理方式 |
 |----------|-------------|-------------|
-| string | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%`, `gt` → `>`, `lt` → `<` |
-| number/currency | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `gt` → `>`, `lt` → `<`, `gte` → `>=`, `lte` → `<=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%` |
+| string | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%`, `startsWith` → `LIKE val%`, `endsWith` → `LIKE %val` |
+| number/currency | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `gt` → `>`, `lt` → `<`, `gte` → `>=`, `lte` → `<=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%` |
 | enum | `[value1, value2]` | `IN (value1, value2)` |
 | date | `{ start, end }` | `start` 已拼接 `00:00:00`，`end` 已拼接 `23:59:59`，直接用 `BETWEEN start AND end` |
 | boolean | `true/false` | `= true` 或 `= false` |
@@ -495,3 +497,124 @@ CREATE TABLE t_table_config (
 - 枚举类型值为数组，后端使用 `IN` 查询
 - 排序字段 `sortBy` 需映射为数据库字段名，`sortOrder` 为 `ascending` / `descending`
 - 建议对 `filters` 中的值做 SQL 注入防护（参数化查询）
+
+**后端公共方法封装建议**：
+
+由于每个列表页面的筛选处理逻辑高度一致，建议封装公共方法，避免每个页面重复编写。核心思路：**通过反射获取分页查询对象的字段，根据字段类型自动构建查询条件**。
+
+**1. 操作符枚举定义**
+
+```java
+public enum FilterOperator {
+    EQ("eq", "="),
+    NEQ("neq", "!="),
+    CONTAINS("contains", "LIKE"),
+    NOT_CONTAINS("notContains", "NOT LIKE"),
+    STARTS_WITH("startsWith", "LIKE"),
+    ENDS_WITH("endsWith", "LIKE"),
+    GT("gt", ">"),
+    LT("lt", "<"),
+    GTE("gte", ">="),
+    LTE("lte", "<=");
+
+    private final String code;
+    private final String sql;
+    // getter, fromCode(String code) 静态方法
+}
+```
+
+**2. 公共筛选方法**
+
+```java
+/**
+ * 通用筛选条件构建器
+ * 通过反射获取分页对象的所有字段，根据 filters 参数自动构建 QueryWrapper 条件
+ *
+ * @param wrapper   MyBatis-Plus QueryWrapper
+ * @param filters   前端传入的 filters 对象
+ * @param clazz     分页查询对象的 Class（字段名即 fieldKey，通过 @TableField 映射数据库列名）
+ */
+public static <T> void buildFilters(QueryWrapper<T> wrapper, Map<String, Object> filters, Class<T> clazz) {
+    if (filters == null || filters.isEmpty()) return;
+
+    for (Map.Entry<String, Object> entry : filters.entrySet()) {
+        String fieldKey = entry.getKey();
+        Object value = entry.getValue();
+
+        // 通过反射获取字段，确定字段类型
+        Field field = ReflectionUtils.findField(clazz, fieldKey);
+        if (field == null) continue;
+
+        Class<?> fieldType = field.getType();
+        String column = getColumnName(field); // 获取 @TableField 注解的列名，无注解则驼峰转下划线
+
+        if (value instanceof Map) {
+            // 操作符筛选：{ operator, value } 或 { start, end }
+            Map<String, Object> filterMap = (Map<String, Object>) value;
+            if (filterMap.containsKey("operator")) {
+                String operatorCode = (String) filterMap.get("operator");
+                Object filterValue = filterMap.get("value");
+                FilterOperator op = FilterOperator.fromCode(operatorCode);
+                if (op == null) continue;
+                applyOperator(wrapper, column, op, filterValue, fieldType);
+            } else if (filterMap.containsKey("start") && filterMap.containsKey("end")) {
+                // 日期范围
+                wrapper.between(column, filterMap.get("start"), filterMap.get("end"));
+            }
+        } else if (value instanceof List) {
+            // 枚举多选
+            List<?> values = (List<?>) value;
+            if (!values.isEmpty()) {
+                wrapper.in(column, values);
+            }
+        } else if (value instanceof Boolean) {
+            wrapper.eq(column, value);
+        }
+    }
+}
+
+/**
+ * 根据操作符类型应用查询条件
+ */
+private static void applyOperator(QueryWrapper<?> wrapper, String column, FilterOperator op, Object value, Class<?> fieldType) {
+    if (value == null || value.toString().isEmpty()) return;
+    String strVal = value.toString();
+
+    switch (op) {
+        case EQ:       wrapper.eq(column, strVal); break;
+        case NEQ:      wrapper.ne(column, strVal); break;
+        case CONTAINS: wrapper.like(column, strVal); break;
+        case NOT_CONTAINS: wrapper.notLike(column, strVal); break;
+        case STARTS_WITH: wrapper.likeRight(column, strVal); break;
+        case ENDS_WITH: wrapper.likeLeft(column, strVal); break;
+        case GT:       wrapper.gt(column, strVal); break;
+        case LT:       wrapper.lt(column, strVal); break;
+        case GTE:      wrapper.ge(column, strVal); break;
+        case LTE:      wrapper.le(column, strVal); break;
+    }
+}
+```
+
+**3. 使用示例**
+
+```java
+@PostMapping("/data")
+public Result<PageResult<UserVO>> listUsers(@RequestBody PageRequest params) {
+    QueryWrapper<User> wrapper = new QueryWrapper<>();
+    // 一行代码完成所有筛选条件构建
+    FilterHelper.buildFilters(wrapper, params.getFilters(), User.class);
+    // 排序
+    if (params.getSortBy() != null) {
+        wrapper.orderBy(true, "descending".equals(params.getSortOrder()),
+            getColumnName(User.class, params.getSortBy()));
+    }
+    Page<User> page = userService.page(new Page<>(params.getPage(), params.getPageSize()), wrapper);
+    return Result.success(PageResult.of(page, UserVO.class));
+}
+```
+
+**设计要点**：
+- 操作符枚举统一管理，前端 `operator` 值与后端枚举 `code` 一一对应
+- 通过反射自动识别字段类型，无需每个页面手写 if-else
+- 公共方法 `buildFilters` 可在所有列表接口复用，新增页面零代码
+- `@TableField` 注解自动映射 fieldKey → 数据库列名，支持驼峰转下划线
