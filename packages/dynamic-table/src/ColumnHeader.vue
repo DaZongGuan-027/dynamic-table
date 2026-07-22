@@ -42,6 +42,7 @@
           clearable
           collapse-tags
           filterable
+          :popper-append-to-body="false"
           style="width: 100%"
           @change="handleSearchConfirm"
         >
@@ -57,6 +58,7 @@
             v-model="searchValue.operator"
             size="mini"
             placeholder="条件"
+            :popper-append-to-body="false"
             style="width: 90px; flex-shrink: 0"
           >
             <el-option label="等于" value="eq" />
@@ -80,6 +82,7 @@
             v-model="searchValue.operator"
             size="mini"
             placeholder="条件"
+            :popper-append-to-body="false"
             style="width: 90px; flex-shrink: 0"
           >
             <el-option label="等于" value="eq" />
@@ -120,6 +123,7 @@
             size="mini"
             :placeholder="'选择' + fieldMeta.fieldLabel"
             clearable
+            :popper-append-to-body="false"
             style="width: 100%"
             @change="handleSearchConfirm"
           >

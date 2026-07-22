@@ -30,6 +30,7 @@
                     clearable
                     collapse-tags
                     filterable
+                    :popper-append-to-body="false"
                   >
                     <el-option
                       v-for="opt in normalizeEnumValues(meta.enumValues)"
@@ -45,6 +46,7 @@
                     <el-select
                       v-model="filterValues[meta.fieldKey].operator"
                       placeholder="条件"
+                      :popper-append-to-body="false"
                       style="width: 90px; flex-shrink: 0"
                       @change="$emit('apply')"
                     >
@@ -69,6 +71,7 @@
                     <el-select
                       v-model="filterValues[meta.fieldKey].operator"
                       placeholder="条件"
+                      :popper-append-to-body="false"
                       style="width: 90px; flex-shrink: 0"
                       @change="$emit('apply')"
                     >
@@ -110,6 +113,7 @@
                     :placeholder="'请选择' + meta.fieldLabel"
                     clearable
                     filterable
+                    :popper-append-to-body="false"
                   >
                     <el-option label="是" :value="true" />
                     <el-option label="否" :value="false" />
