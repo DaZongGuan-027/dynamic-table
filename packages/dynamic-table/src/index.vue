@@ -3,11 +3,13 @@
 
     <filter-panel
       v-if="activeFilterMetaList.length > 0"
+      ref="filterPanel"
       :filter-meta-list="activeFilterMetaList"
       :filter-values="filterValues"
       :expanded="filterExpanded"
       :filter-schemes="filterSchemes"
       :active-scheme-index="activeSchemeIndex"
+      :popper-append-to-body="filterPopperAppendToBody"
       @toggle-expand="toggleFilterExpand"
       @apply="applyFilters"
       @reset="resetFilters"
@@ -74,16 +76,20 @@
           align="center"
         >
           <template slot-scope="scope">
-            <template v-for="(action, idx) in getRowActions">
-              <el-button
-                :key="idx"
-                :type="action.type || 'text'"
-                :icon="action.icon"
-                size="mini"
-                :style="action.style || {}"
-                @click="handleRowAction(action, scope.row)"
-              >{{ action.label }}</el-button>
-            </template>
+            <slot name="actions" :row="scope.row">
+              <template v-for="(action, idx) in getRowActions">
+                <el-button
+                  v-if="isActionVisible(action, scope.row)"
+                  :key="idx"
+                  :type="resolveActionProp(action.type, scope.row) || 'text'"
+                  :icon="action.icon"
+                  :disabled="resolveActionProp(action.disabled, scope.row)"
+                  size="mini"
+                  :style="action.style || {}"
+                  @click="handleRowAction(action, scope.row)"
+                >{{ action.label }}</el-button>
+              </template>
+            </slot>
           </template>
         </el-table-column>
         <el-table-column
@@ -103,6 +109,7 @@
               :field-meta="fieldMetaMap[fieldKey]"
               :column-search-value="columnSearchValues[fieldKey]"
               :current-sort-order="currentSortBy === fieldKey ? currentSortOrder : ''"
+              :popper-append-to-body="filterPopperAppendToBody"
               @sort-change="handleColumnSortChange"
               @search-change="handleColumnSearchChange"
               @search-confirm="handleColumnSearchConfirm"
@@ -187,7 +194,14 @@ export default {
     pageSizes: { type: Array, default: () => [10, 20, 50, 100] },
     headerAlign: { type: String, default: 'center' },
 
-    actionColumnWidth: { type: [String, Number], default: 150 }
+    actionColumnWidth: { type: [String, Number], default: 150 },
+
+    filterPopperAppendToBody: { type: Boolean, default: true },
+    pageParamName: { type: String, default: 'page' },
+    pageSizeParamName: { type: String, default: 'pageSize' },
+    defaultFilterValues: { type: Object, default: () => ({}) },
+    filterCacheKey: { type: String, default: '' },
+    cacheFilters: { type: Boolean, default: false }
   },
 
   data() {
@@ -314,8 +328,8 @@ export default {
           }
         })
         const params = {
-          page: this.currentPage,
-          pageSize: this.pageSize,
+          [this.pageParamName]: this.currentPage,
+          [this.pageSizeParamName]: this.pageSize,
           filters: mergedFilters,
           sortBy: this.currentSortBy,
           sortOrder: this.currentSortOrder
@@ -387,6 +401,17 @@ export default {
       this.$emit('row-action', { action: action.action, row })
     },
 
+    resolveActionProp(prop, row) {
+      if (typeof prop === 'function') return prop(row)
+      return prop
+    },
+
+    isActionVisible(action, row) {
+      if (typeof action.visible === 'function') return action.visible(row)
+      if (action.visible === false) return false
+      return true
+    },
+
 
     handleSizeChange(size) {
       this.pageSize = size
@@ -406,12 +431,14 @@ export default {
     handleResetDefault() {
       this.resetToDefault()
       this.clearStorageConfig()
-      this.initFilterValues()
+      this.initFilterValues(false)
+      this._clearCachedFilters()
       this.columnSearchValues = {}
       this.currentSortBy = ''
       this.currentSortOrder = ''
       this.activeSchemeIndex = -1
       this.currentPage = 1
+      this.scrollFilterToTop()
       this.tableKey++
       this.$nextTick(() => {
         this.calcTableHeight()
@@ -421,17 +448,20 @@ export default {
     },
 
     applyFilters() {
+      this._saveCachedFilters()
       this.currentPage = 1
       this.fetchData()
     },
 
     resetFilters() {
-      this.initFilterValues()
+      this.initFilterValues(false)
+      this._clearCachedFilters()
       this.columnSearchValues = {}
       this.currentSortBy = ''
       this.currentSortOrder = ''
       this.activeSchemeIndex = -1
       this.currentPage = 1
+      this.scrollFilterToTop()
       this.fetchData()
     },
 

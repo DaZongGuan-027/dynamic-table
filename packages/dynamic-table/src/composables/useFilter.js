@@ -1,4 +1,10 @@
 export default {
+  props: {
+    defaultFilterValues: { type: Object, default: () => ({}) },
+    filterCacheKey: { type: String, default: '' },
+    cacheFilters: { type: Boolean, default: false }
+  },
+
   data() {
     return {
       filterValues: {},
@@ -36,7 +42,7 @@ export default {
   },
 
   methods: {
-    initFilterValues() {
+    initFilterValues(applyDefaults) {
       const values = {}
       this.activeFilterMetaList.forEach(meta => {
         const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
@@ -62,27 +68,79 @@ export default {
           }
         }
       })
+
+      if (applyDefaults && this.defaultFilterValues) {
+        Object.keys(this.defaultFilterValues).forEach(key => {
+          if (values[key] !== undefined) {
+            values[key] = JSON.parse(JSON.stringify(this.defaultFilterValues[key]))
+          }
+        })
+      }
+
+      if (applyDefaults && this.cacheFilters && this.filterCacheKey) {
+        const cached = this._loadCachedFilters()
+        if (cached) {
+          Object.keys(cached).forEach(key => {
+            if (values[key] !== undefined) {
+              values[key] = cached[key]
+            }
+          })
+        }
+      }
+
       this.filterValues = values
     },
 
+    _loadCachedFilters() {
+      try {
+        const raw = localStorage.getItem('dynamic_table_filter_' + this.filterCacheKey)
+        if (raw) return JSON.parse(raw)
+      } catch (e) {}
+      return null
+    },
+
+    _saveCachedFilters() {
+      if (!this.cacheFilters || !this.filterCacheKey) return
+      try {
+        localStorage.setItem('dynamic_table_filter_' + this.filterCacheKey, JSON.stringify(this.filterValues))
+      } catch (e) {}
+    },
+
+    _clearCachedFilters() {
+      if (!this.filterCacheKey) return
+      try {
+        localStorage.removeItem('dynamic_table_filter_' + this.filterCacheKey)
+      } catch (e) {}
+    },
+
     resetFilters() {
-      this.initFilterValues()
+      this.initFilterValues(false)
+      this._clearCachedFilters()
       this.$emit('filter-change', {})
     },
 
     applyFilters() {
+      this._saveCachedFilters()
       this.$emit('filter-change', this.activeFilters)
     },
 
     toggleFilterExpand() {
       this.filterExpanded = !this.filterExpanded
+    },
+
+    scrollFilterToTop() {
+      this.$nextTick(() => {
+        const el = this.$el && this.$el.querySelector('.filter-form-scroll')
+        if (el) el.scrollTop = 0
+      })
     }
   },
 
   watch: {
     activeFilterMetaList: {
       handler() {
-        this.initFilterValues()
+        const hasCache = this.cacheFilters && this.filterCacheKey && this._loadCachedFilters()
+        this.initFilterValues(true)
       },
       immediate: true
     }

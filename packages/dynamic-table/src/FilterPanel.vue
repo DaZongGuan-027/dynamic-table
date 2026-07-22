@@ -30,7 +30,7 @@
                     clearable
                     collapse-tags
                     filterable
-                    :popper-append-to-body="false"
+                    :popper-append-to-body="popperAppendToBody"
                   >
                     <el-option
                       v-for="opt in normalizeEnumValues(meta.enumValues)"
@@ -46,7 +46,7 @@
                     <el-select
                       v-model="filterValues[meta.fieldKey].operator"
                       placeholder="条件"
-                      :popper-append-to-body="false"
+                      :popper-append-to-body="popperAppendToBody"
                       style="width: 90px; flex-shrink: 0"
                       @change="$emit('apply')"
                     >
@@ -71,7 +71,7 @@
                     <el-select
                       v-model="filterValues[meta.fieldKey].operator"
                       placeholder="条件"
-                      :popper-append-to-body="false"
+                      :popper-append-to-body="popperAppendToBody"
                       style="width: 90px; flex-shrink: 0"
                       @change="$emit('apply')"
                     >
@@ -102,6 +102,7 @@
                     value-format="yyyy-MM-dd"
                     clearable
                     :picker-options="datePickerOptions"
+                    :append-to-body="popperAppendToBody"
                     style="width: 100%"
                   />
                 </template>
@@ -113,7 +114,7 @@
                     :placeholder="'请选择' + meta.fieldLabel"
                     clearable
                     filterable
-                    :popper-append-to-body="false"
+                    :popper-append-to-body="popperAppendToBody"
                   >
                     <el-option label="是" :value="true" />
                     <el-option label="否" :value="false" />
@@ -178,7 +179,8 @@ export default {
     filterValues: { type: Object, default: () => ({}) },
     expanded: { type: Boolean, default: true },
     filterSchemes: { type: Array, default: () => [] },
-    activeSchemeIndex: { type: Number, default: -1 }
+    activeSchemeIndex: { type: Number, default: -1 },
+    popperAppendToBody: { type: Boolean, default: true }
   },
 
   data() {

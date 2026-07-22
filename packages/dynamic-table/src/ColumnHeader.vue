@@ -42,7 +42,7 @@
           clearable
           collapse-tags
           filterable
-          :popper-append-to-body="false"
+          :popper-append-to-body="popperAppendToBody"
           style="width: 100%"
           @change="handleSearchConfirm"
         >
@@ -58,7 +58,7 @@
             v-model="searchValue.operator"
             size="mini"
             placeholder="条件"
-            :popper-append-to-body="false"
+            :popper-append-to-body="popperAppendToBody"
             style="width: 90px; flex-shrink: 0"
           >
             <el-option label="等于" value="eq" />
@@ -82,7 +82,7 @@
             v-model="searchValue.operator"
             size="mini"
             placeholder="条件"
-            :popper-append-to-body="false"
+            :popper-append-to-body="popperAppendToBody"
             style="width: 90px; flex-shrink: 0"
           >
             <el-option label="等于" value="eq" />
@@ -113,6 +113,7 @@
             value-format="yyyy-MM-dd"
             clearable
             :picker-options="datePickerOptions"
+            :append-to-body="popperAppendToBody"
             style="width: 100%"
           />
           <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>
@@ -123,7 +124,7 @@
             size="mini"
             :placeholder="'选择' + fieldMeta.fieldLabel"
             clearable
-            :popper-append-to-body="false"
+            :popper-append-to-body="popperAppendToBody"
             style="width: 100%"
             @change="handleSearchConfirm"
           >
@@ -151,7 +152,8 @@ export default {
     fieldKey: { type: String, required: true },
     fieldMeta: { type: Object, required: true },
     columnSearchValue: { type: [String, Object, Array], default: '' },
-    currentSortOrder: { type: String, default: '' }
+    currentSortOrder: { type: String, default: '' },
+    popperAppendToBody: { type: Boolean, default: true }
   },
 
   data() {
