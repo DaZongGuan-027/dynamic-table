@@ -259,8 +259,8 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 |----------|------|----------|
 | eq | 等于 | string, number, currency |
 | neq | 不等于 | string, number, currency |
-| contains | 包含 | string, number, currency |
-| notContains | 不包含 | string, number, currency |
+| contains | 包含 | string |
+| notContains | 不包含 | string |
 | startsWith | 开头是 | string |
 | endsWith | 结尾是 | string |
 | gt | 大于 | number, currency |
@@ -488,7 +488,7 @@ CREATE TABLE t_table_config (
 | 字段类型 | filters 结构 | 后端处理方式 |
 |----------|-------------|-------------|
 | string | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%`, `startsWith` → `LIKE val%`, `endsWith` → `LIKE %val` |
-| number/currency | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `gt` → `>`, `lt` → `<`, `gte` → `>=`, `lte` → `<=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%` |
+| number/currency | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `gt` → `>`, `lt` → `<`, `gte` → `>=`, `lte` → `<=` |
 | enum | `[value1, value2]` | `IN (value1, value2)` |
 | date | `{ start, end }` | `start` 已拼接 `00:00:00`，`end` 已拼接 `23:59:59`，直接用 `BETWEEN start AND end` |
 | boolean | `true/false` | `= true` 或 `= false` |

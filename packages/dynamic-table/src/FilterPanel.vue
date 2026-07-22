@@ -29,6 +29,7 @@
                     multiple
                     clearable
                     collapse-tags
+                    filterable
                   >
                     <el-option
                       v-for="opt in normalizeEnumValues(meta.enumValues)"
@@ -72,12 +73,11 @@
                       @change="$emit('apply')"
                     >
                       <el-option label="等于" value="eq" />
+                      <el-option label="不等于" value="neq" />
                       <el-option label="大于" value="gt" />
                       <el-option label="小于" value="lt" />
                       <el-option label="大于等于" value="gte" />
                       <el-option label="小于等于" value="lte" />
-                      <el-option label="包含" value="contains" />
-                      <el-option label="不包含" value="notContains" />
                     </el-select>
                     <el-input
                       v-model="filterValues[meta.fieldKey].value"
@@ -109,6 +109,7 @@
                     v-model="filterValues[meta.fieldKey]"
                     :placeholder="'请选择' + meta.fieldLabel"
                     clearable
+                    filterable
                   >
                     <el-option label="是" :value="true" />
                     <el-option label="否" :value="false" />
