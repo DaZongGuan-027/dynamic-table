@@ -77,7 +77,8 @@
             <template v-for="(action, idx) in getRowActions">
               <el-button
                 :key="idx"
-                type="text"
+                :type="action.type || 'text'"
+                :icon="action.icon"
                 size="mini"
                 :style="action.style || {}"
                 @click="handleRowAction(action, scope.row)"

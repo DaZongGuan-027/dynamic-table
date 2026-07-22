@@ -89,9 +89,9 @@ export default {
         },
         { fieldKey: 'createTime', fieldLabel: '创建时间', fieldType: 'date', filterable: true, sortable: true, width: 170, align: 'center' },
         { fieldKey: '__actions', fieldLabel: '操作', fieldType: 'actions', width: 150, actions: [
-          { label: '查看', action: 'view' },
-          { label: '编辑', action: 'edit' },
-          { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
+          { label: '查看', action: 'view', icon: 'el-icon-view' },
+          { label: '编辑', action: 'edit', type: 'primary', icon: 'el-icon-edit' },
+          { label: '删除', action: 'delete', type: 'danger', icon: 'el-icon-delete' }
         ]}
       ]
     }
@@ -169,9 +169,9 @@ export default {
 
 ```js
 { fieldKey: '__actions', fieldLabel: '操作', fieldType: 'actions', width: 150, actions: [
-  { label: '查看', action: 'view' },
-  { label: '编辑', action: 'edit' },
-  { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
+  { label: '查看', action: 'view', icon: 'el-icon-view' },
+  { label: '编辑', action: 'edit', type: 'primary', icon: 'el-icon-edit' },
+  { label: '删除', action: 'delete', type: 'danger', icon: 'el-icon-delete' }
 ]}
 ```
 
@@ -179,6 +179,8 @@ export default {
 |------|------|------|------|
 | label | String | 是 | 按钮文字 |
 | action | String | 是 | 操作标识，用于 `row-action` 事件回调中区分 |
+| type | String | 否 | 按钮类型，默认 `text`。可选 `primary`/`success`/`warning`/`danger`/`info`/`text` 等 |
+| icon | String | 否 | 按钮图标，如 `el-icon-edit`、`el-icon-delete` |
 | style | Object | 否 | 按钮自定义样式 |
 
 > 特殊列的 `fieldKey` 推荐使用 `__selection`、`__index`、`__actions` 前缀，组件内部通过 `fieldType` 识别。不声明对应 `fieldType` 的特殊列则不会显示。

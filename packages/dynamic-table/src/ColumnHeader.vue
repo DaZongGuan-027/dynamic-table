@@ -94,6 +94,7 @@
             size="mini"
             :placeholder="'输入' + fieldMeta.fieldLabel"
             clearable
+            @input="searchValue.value = searchValue.value.replace(/[^\d.-]/g, '').replace(/(\..*)\./g, '$1')"
             @keyup.enter.native="handleSearchConfirm"
           />
           <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>

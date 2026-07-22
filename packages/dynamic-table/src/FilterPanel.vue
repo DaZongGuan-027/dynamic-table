@@ -83,6 +83,7 @@
                       v-model="filterValues[meta.fieldKey].value"
                       :placeholder="'输入' + meta.fieldLabel"
                       clearable
+                      @input="filterValues[meta.fieldKey].value = filterValues[meta.fieldKey].value.replace(/[^\d.-]/g, '').replace(/(\..*)\./g, '$1')"
                       @keyup.enter.native="$emit('apply')"
                     />
                   </div>
