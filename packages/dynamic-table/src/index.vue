@@ -2,9 +2,10 @@
   <div class="dynamic-table" v-loading="configLoading">
 
     <filter-panel
-      v-if="activeFilterMetaList.length > 0"
+      v-if="activeFilterMetaList.length > 0 || allDataFields.length > 0"
       ref="filterPanel"
       :filter-meta-list="activeFilterMetaList"
+      :all-field-meta-list="fieldMetaList"
       :filter-values="filterValues"
       :expanded="filterExpanded"
       :filter-schemes="filterSchemes"
@@ -217,7 +218,8 @@ export default {
       currentSortOrder: '',
       selfAdaptiveHeight: 500,
       columnSearchValues: {},
-      activeSchemeIndex: -1
+      activeSchemeIndex: -1,
+      _lastCustomFilterValues: {}
     }
   },
 
@@ -229,6 +231,12 @@ export default {
 
     hasRowActions() {
       return this.fieldMetaList.some(f => f.fieldType === 'actions')
+    },
+
+    allDataFields() {
+      return this.fieldMetaList.filter(f => {
+        return f.fieldType !== 'selection' && f.fieldType !== 'index' && f.fieldType !== 'actions'
+      })
     },
 
     hasSelection() {
@@ -327,6 +335,11 @@ export default {
             mergedFilters[key] = val
           }
         })
+        if (this._lastCustomFilterValues) {
+          Object.keys(this._lastCustomFilterValues).forEach(key => {
+            mergedFilters[key] = this._lastCustomFilterValues[key]
+          })
+        }
         const params = {
           [this.pageParamName]: this.currentPage,
           [this.pageSizeParamName]: this.pageSize,
@@ -438,6 +451,8 @@ export default {
       this.currentSortOrder = ''
       this.activeSchemeIndex = -1
       this.currentPage = 1
+      this._lastCustomFilterValues = {}
+      if (this.$refs.filterPanel) this.$refs.filterPanel.resetCustomFilters()
       this.scrollFilterToTop()
       this.tableKey++
       this.$nextTick(() => {
@@ -447,8 +462,9 @@ export default {
       this.$message.success('已还原为默认配置')
     },
 
-    applyFilters() {
+    applyFilters(customFilterValues) {
       this._saveCachedFilters()
+      this._lastCustomFilterValues = customFilterValues || {}
       this.currentPage = 1
       this.fetchData()
     },
@@ -461,6 +477,8 @@ export default {
       this.currentSortOrder = ''
       this.activeSchemeIndex = -1
       this.currentPage = 1
+      this._lastCustomFilterValues = {}
+      if (this.$refs.filterPanel) this.$refs.filterPanel.resetCustomFilters()
       this.scrollFilterToTop()
       this.fetchData()
     },

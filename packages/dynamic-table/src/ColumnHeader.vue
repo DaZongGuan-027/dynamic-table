@@ -33,26 +33,32 @@
       </div>
 
       <div v-if="showSearch" class="search-area" @click.stop>
-        <el-select
-          v-if="hasEnumOptions"
-          v-model="searchValue"
-          size="mini"
-          :placeholder="'选择' + fieldMeta.fieldLabel"
-          multiple
-          clearable
-          collapse-tags
-          filterable
-          :popper-append-to-body="popperAppendToBody"
-          style="width: 100%"
-          @change="handleSearchConfirm"
-        >
-          <el-option
-            v-for="opt in normalizedEnumValues"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
-        </el-select>
+        <div v-if="hasEnumOptions" class="enum-search">
+          <el-select
+            v-model="searchValue"
+            size="mini"
+            :placeholder="'选择' + fieldMeta.fieldLabel"
+            multiple
+            clearable
+            collapse-tags
+            filterable
+            :popper-append-to-body="popperAppendToBody"
+            style="width: 100%"
+          >
+            <el-option
+              label="全选"
+              value="__all__"
+              @click.native="handleEnumSelectAll($event)"
+            />
+            <el-option
+              v-for="opt in normalizedEnumValues"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>
+        </div>
         <div v-else-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType" class="compare-search">
           <el-select
             v-model="searchValue.operator"
@@ -281,6 +287,13 @@ export default {
       }
       return []
     },
+    handleEnumSelectAll(e) {
+      e.stopPropagation()
+      const allValues = this.normalizedEnumValues.map(o => o.value)
+      const current = this.searchValue || []
+      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
+      this.searchValue = isAllSelected ? [] : [...allValues]
+    },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue
       this.initSearchValue()
@@ -414,6 +427,15 @@ export default {
 .search-area {
   padding: 8px 10px;
   border-top: 1px solid #dcdfe6;
+}
+.enum-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.enum-search .el-select {
+  flex: 1;
+  min-width: 0;
 }
 .compare-search {
   display: flex;
