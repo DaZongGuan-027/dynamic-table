@@ -42,6 +42,7 @@
             clearable
             collapse-tags
             filterable
+            :filter-method="setEnumSearchQuery"
             :popper-append-to-body="popperAppendToBody"
             style="width: 100%"
           >
@@ -51,7 +52,7 @@
               @click.native="handleEnumSelectAll($event)"
             />
             <el-option
-              v-for="opt in normalizedEnumValues"
+              v-for="opt in filteredEnumValues"
               :key="opt.value"
               :label="opt.label"
               :value="opt.value"
@@ -167,6 +168,7 @@ export default {
       popoverVisible: false,
       showSearch: false,
       searchValue: '',
+      enumSearchQuery: '',
       datePickerOptions: {
         shortcuts: [
           {
@@ -275,6 +277,13 @@ export default {
     hasEnumOptions() {
       return this.normalizedEnumValues.length > 0
 
+    },
+
+    filteredEnumValues() {
+      const all = this.normalizedEnumValues
+      const query = (this.enumSearchQuery || '').toLowerCase()
+      if (!query) return all
+      return all.filter(o => (o.label + '').toLowerCase().includes(query) || (o.value + '').toLowerCase().includes(query))
     }
   },
 
@@ -289,10 +298,13 @@ export default {
     },
     handleEnumSelectAll(e) {
       e.stopPropagation()
-      const allValues = this.normalizedEnumValues.map(o => o.value)
+      const filteredValues = this.filteredEnumValues.map(o => o.value)
       const current = this.searchValue || []
-      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
-      this.searchValue = isAllSelected ? [] : [...allValues]
+      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
+      this.searchValue = isAllSelected ? [] : [...filteredValues]
+    },
+    setEnumSearchQuery(query) {
+      this.enumSearchQuery = query || ''
     },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue

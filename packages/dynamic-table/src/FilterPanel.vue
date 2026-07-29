@@ -30,6 +30,7 @@
                     clearable
                     collapse-tags
                     filterable
+                    :filter-method="(q) => setEnumQuery(meta.fieldKey, q)"
                     :popper-append-to-body="popperAppendToBody"
                   >
                     <el-option
@@ -38,7 +39,7 @@
                       @click.native="handleSelectAll(meta, $event)"
                     />
                     <el-option
-                      v-for="opt in normalizeEnumValues(meta.enumValues)"
+                      v-for="opt in getFilteredEnumOptions(meta)"
                       :key="opt.value"
                       :label="opt.label"
                       :value="opt.value"
@@ -158,6 +159,7 @@
                   clearable
                   collapse-tags
                   filterable
+                  :filter-method="(q) => setEnumQuery('__custom__', q)"
                   size="small"
                   :popper-append-to-body="popperAppendToBody"
                   style="flex: 1; min-width: 0"
@@ -168,7 +170,7 @@
                     @click.native="handleCustomSelectAll($event)"
                   />
                   <el-option
-                    v-for="opt in customFilter.enumOptions"
+                    v-for="opt in getFilteredCustomEnumOptions()"
                     :key="opt.value"
                     :label="opt.label"
                     :value="opt.value"
@@ -305,6 +307,7 @@ export default {
 
   data() {
     return {
+      enumFilterQuery: {},
       customFilter: {
         fieldKey: '',
         fieldType: '',
@@ -421,10 +424,26 @@ export default {
     },
     handleSelectAll(meta, e) {
       e.stopPropagation()
-      const allValues = this.normalizeEnumValues(meta.enumValues).map(o => o.value)
+      const filtered = this.getFilteredEnumOptions(meta)
+      const filteredValues = filtered.map(o => o.value)
       const current = this.filterValues[meta.fieldKey] || []
-      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
-      this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...allValues])
+      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
+      this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...filteredValues])
+    },
+    setEnumQuery(fieldKey, query) {
+      this.$set(this.enumFilterQuery, fieldKey, query || '')
+    },
+    getFilteredEnumOptions(meta) {
+      const all = this.normalizeEnumValues(meta.enumValues)
+      const query = (this.enumFilterQuery[meta.fieldKey] || '').toLowerCase()
+      if (!query) return all
+      return all.filter(o => (o.label + '').toLowerCase().includes(query) || (o.value + '').toLowerCase().includes(query))
+    },
+    getFilteredCustomEnumOptions() {
+      const all = this.customFilter.enumOptions || []
+      const query = (this.enumFilterQuery['__custom__'] || '').toLowerCase()
+      if (!query) return all
+      return all.filter(o => (o.label + '').toLowerCase().includes(query) || (o.value + '').toLowerCase().includes(query))
     },
     handleCustomFieldChange() {
       const cf = this.customFilter
@@ -454,11 +473,11 @@ export default {
     },
     handleCustomSelectAll(e) {
       e.stopPropagation()
-      const cf = this.customFilter
-      const allValues = cf.enumOptions.map(o => o.value)
-      const current = cf.value || []
-      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
-      cf.value = isAllSelected ? [] : [...allValues]
+      const filtered = this.getFilteredCustomEnumOptions()
+      const filteredValues = filtered.map(o => o.value)
+      const current = this.customFilter.value || []
+      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
+      this.customFilter.value = isAllSelected ? [] : [...filteredValues]
     },
     handleCustomNumberInput() {
       const cf = this.customFilter
