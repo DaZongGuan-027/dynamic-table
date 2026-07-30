@@ -42,8 +42,9 @@
             clearable
             collapse-tags
             filterable
-            :filter-method="handleEnumSearchFilter"
-            @visible-change="(v) => !v && handleEnumSearchFilter('')"
+            remote
+            :remote-method="handleEnumRemoteFilter"
+            @visible-change="(v) => !v && handleEnumRemoteFilter('')"
             :popper-append-to-body="popperAppendToBody"
             style="width: 100%"
           >
@@ -53,7 +54,7 @@
               @click.native="handleEnumSelectAll($event)"
             />
             <el-option
-              v-for="opt in (filteredEnumValues || normalizedEnumValues)"
+              v-for="opt in (enumSearchOptions || normalizedEnumValues)"
               :key="opt.value"
               :label="opt.label"
               :value="opt.value"
@@ -169,7 +170,7 @@ export default {
       popoverVisible: false,
       showSearch: false,
       searchValue: '',
-      filteredEnumValues: null,
+      enumSearchOptions: null,
       datePickerOptions: {
         shortcuts: [
           {
@@ -293,19 +294,20 @@ export default {
     },
     handleEnumSelectAll(e) {
       e.stopPropagation()
-      const filtered = this.filteredEnumValues || this.normalizedEnumValues
-      const filteredValues = filtered.map(o => o.value)
+      const options = this.enumSearchOptions || this.normalizedEnumValues
+      const allValues = options.map(o => o.value)
       const current = this.searchValue || []
-      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
-      this.searchValue = isAllSelected ? [] : [...filteredValues]
+      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
+      this.searchValue = isAllSelected ? [] : [...allValues]
     },
-    handleEnumSearchFilter(query) {
+    handleEnumRemoteFilter(query) {
+      const all = this.normalizedEnumValues
       const q = (query || '').toLowerCase()
       if (!q) {
-        this.filteredEnumValues = null
+        this.enumSearchOptions = null
         return
       }
-      this.filteredEnumValues = this.normalizedEnumValues.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
+      this.enumSearchOptions = all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
     },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue

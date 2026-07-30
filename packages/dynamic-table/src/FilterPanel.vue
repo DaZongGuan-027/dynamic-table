@@ -30,9 +30,10 @@
                     clearable
                     collapse-tags
                     filterable
-                    :filter-method="(q) => handleEnumFilter(meta.fieldKey, meta.enumValues, q)"
+                    remote
+                    :remote-method="(q) => handleEnumRemoteFilter(meta.fieldKey, meta.enumValues, q)"
                     :popper-append-to-body="popperAppendToBody"
-                    @visible-change="(v) => !v && handleEnumFilter(meta.fieldKey, meta.enumValues, '')"
+                    @visible-change="(v) => !v && handleEnumRemoteFilter(meta.fieldKey, meta.enumValues, '')"
                   >
                     <el-option
                       label="全选"
@@ -40,7 +41,7 @@
                       @click.native="handleSelectAll(meta, $event)"
                     />
                     <el-option
-                      v-for="opt in (filteredEnumOptionsMap[meta.fieldKey] || normalizeEnumValues(meta.enumValues))"
+                      v-for="opt in (enumOptionsMap[meta.fieldKey] || normalizeEnumValues(meta.enumValues))"
                       :key="opt.value"
                       :label="opt.label"
                       :value="opt.value"
@@ -160,8 +161,9 @@
                   clearable
                   collapse-tags
                   filterable
-                  :filter-method="(q) => handleEnumFilter('__custom__', customFilter.enumOptions, q)"
-                  @visible-change="(v) => !v && handleEnumFilter('__custom__', customFilter.enumOptions, '')"
+                  remote
+                  :remote-method="(q) => handleEnumRemoteFilter('__custom__', customFilter.enumOptions, q)"
+                  @visible-change="(v) => !v && handleEnumRemoteFilter('__custom__', customFilter.enumOptions, '')"
                   size="small"
                   :popper-append-to-body="popperAppendToBody"
                   style="flex: 1; min-width: 0"
@@ -172,7 +174,7 @@
                     @click.native="handleCustomSelectAll($event)"
                   />
                   <el-option
-                    v-for="opt in (filteredEnumOptionsMap['__custom__'] || customFilter.enumOptions)"
+                    v-for="opt in (enumOptionsMap['__custom__'] || customFilter.enumOptions)"
                     :key="opt.value"
                     :label="opt.label"
                     :value="opt.value"
@@ -309,8 +311,7 @@ export default {
 
   data() {
     return {
-      enumFilterQuery: {},
-      filteredEnumOptionsMap: {},
+      enumOptionsMap: {},
       customFilter: {
         fieldKey: '',
         fieldType: '',
@@ -427,20 +428,20 @@ export default {
     },
     handleSelectAll(meta, e) {
       e.stopPropagation()
-      const filtered = this.filteredEnumOptionsMap[meta.fieldKey] || this.normalizeEnumValues(meta.enumValues)
-      const filteredValues = filtered.map(o => o.value)
+      const options = this.enumOptionsMap[meta.fieldKey] || this.normalizeEnumValues(meta.enumValues)
+      const allValues = options.map(o => o.value)
       const current = this.filterValues[meta.fieldKey] || []
-      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
-      this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...filteredValues])
+      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
+      this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...allValues])
     },
-    handleEnumFilter(fieldKey, enumValues, query) {
+    handleEnumRemoteFilter(fieldKey, enumValues, query) {
       const all = this.normalizeEnumValues(enumValues)
       const q = (query || '').toLowerCase()
       if (!q) {
-        this.$set(this.filteredEnumOptionsMap, fieldKey, null)
+        this.$set(this.enumOptionsMap, fieldKey, all)
         return
       }
-      this.$set(this.filteredEnumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)))
+      this.$set(this.enumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)))
     },
     handleCustomFieldChange() {
       const cf = this.customFilter
@@ -470,11 +471,11 @@ export default {
     },
     handleCustomSelectAll(e) {
       e.stopPropagation()
-      const filtered = this.filteredEnumOptionsMap['__custom__'] || this.customFilter.enumOptions
-      const filteredValues = filtered.map(o => o.value)
+      const options = this.enumOptionsMap['__custom__'] || this.customFilter.enumOptions
+      const allValues = options.map(o => o.value)
       const current = this.customFilter.value || []
-      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
-      this.customFilter.value = isAllSelected ? [] : [...filteredValues]
+      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
+      this.customFilter.value = isAllSelected ? [] : [...allValues]
     },
     handleCustomNumberInput() {
       const cf = this.customFilter

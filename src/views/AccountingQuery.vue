@@ -78,7 +78,19 @@ export default {
           filterable: true,
           sortable: true,
           width: 120,
-          align: 'left'
+          align: 'left',
+          enumValues: [
+            { label: '库存现金', value: '库存现金' },
+            { label: '银行存款', value: '银行存款' },
+            { label: '应收账款', value: '应收账款' },
+            { label: '主营业务收入', value: '主营业务收入' },
+            { label: '应交税费', value: '应交税费' },
+            { label: '管理费用', value: '管理费用' },
+            { label: '应付职工薪酬', value: '应付职工薪酬' },
+            { label: '销售费用', value: '销售费用' },
+            { label: '原材料', value: '原材料' },
+            { label: '应付账款', value: '应付账款' }
+          ]
         },
         {
           fieldKey: 'summary',
