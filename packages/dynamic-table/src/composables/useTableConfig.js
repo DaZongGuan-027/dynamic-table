@@ -65,6 +65,7 @@ export default {
           this.columnOrder = this._parseJsonField(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
           this.filterSchemes = this._parseJsonField(config.filterSchemes) || []
           this.columnWidths = this._parseJsonField(config.columnWidths) || {}
+          this._initPageSizeFromConfig()
 
         } else {
           this.resetToDefault()
@@ -82,6 +83,16 @@ export default {
         try { return JSON.parse(val) } catch (e) { return null }
       }
       return null
+    },
+
+    _initPageSizeFromConfig() {
+      const dps = this.columnWidths && this.columnWidths['__defaultPageSize']
+      const ps = this.columnWidths && this.columnWidths['__pageSizes']
+      if (dps && dps >= 10 && dps <= 2000) {
+        this.pageSize = dps
+      } else if (ps && ps.length > 0) {
+        this.pageSize = Math.min(...ps)
+      }
     },
 
     resetToDefault() {
@@ -136,7 +147,7 @@ export default {
       }
     },
 
-    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes }) {
+    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, defaultPageSize }) {
       this.visibleFields = visibleFields
       this.columnOrder = columnOrder
       this.frozenFields = frozenFields
@@ -146,7 +157,14 @@ export default {
       this.filterSchemes = filterSchemes
       if (pageSizes) {
         this.$set(this.columnWidths, '__pageSizes', pageSizes)
-        this.pageSize = pageSizes[0] || 10
+      }
+      if (defaultPageSize !== undefined) {
+        this.$set(this.columnWidths, '__defaultPageSize', defaultPageSize)
+      }
+      if (defaultPageSize && defaultPageSize >= 10 && defaultPageSize <= 2000) {
+        this.pageSize = defaultPageSize
+      } else if (pageSizes && pageSizes.length > 0) {
+        this.pageSize = Math.min(...pageSizes)
       }
       this.saveConfig()
       this.tableKey++

@@ -154,6 +154,7 @@
       :filter-schemes="filterSchemes"
       :current-filter-values="filterValues"
       :page-sizes="computedPageSizes"
+      :default-page-size="computedDefaultPageSize"
 
       @confirm="handleConfigChange"
       @reset-default="handleResetDefault"
@@ -233,6 +234,18 @@ export default {
     computedPageSizes() {
       const saved = this.columnWidths && this.columnWidths['__pageSizes']
       return saved && saved.length > 0 ? saved : this.pageSizes
+    },
+
+    computedDefaultPageSize() {
+      return this.columnWidths && this.columnWidths['__defaultPageSize'] || 0
+    },
+
+    computedPageSize() {
+      const dps = this.computedDefaultPageSize
+      if (dps && dps >= 10 && dps <= 2000) return dps
+      const ps = this.computedPageSizes
+      if (ps && ps.length > 0) return Math.min(...ps)
+      return this.pageSize
     },
 
     hasRowActions() {

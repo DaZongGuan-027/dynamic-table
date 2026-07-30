@@ -164,16 +164,29 @@
       <el-tab-pane label="分页配置" name="pagination">
         <div class="tab-tip">
           <i class="el-icon-info"></i>
-          设置默认每页条数，也可自定义，最大不超过2000
+          设置分页条数选项和默认展示条数，最大不超过2000
         </div>
         <div class="pagination-config">
-          <div class="pagination-config-label">默认每页条数</div>
+          <div class="pagination-config-label">默认展示条数</div>
+          <div class="pagination-config-default-size">
+            <el-input-number
+              v-model="editDefaultPageSize"
+              size="small"
+              :min="10"
+              :max="2000"
+              :step="10"
+              controls-position="right"
+              style="width: 160px"
+            />
+            
+          </div>
+          <div class="pagination-config-label">分页条数选项</div>
           <div class="pagination-config-options">
             <div
               v-for="opt in presetPageSizes"
               :key="opt"
               class="page-size-chip"
-              :class="{ 'is-active': editPageSizes.includes(opt), 'is-custom': !presetPageSizes.includes(opt) }"
+              :class="{ 'is-active': editPageSizes.includes(opt) }"
               @click="togglePresetPageSize(opt)"
             >{{ opt }}</div>
           </div>
@@ -234,7 +247,8 @@ export default {
     columnOrder: { type: Array, default: () => [] },
     filterSchemes: { type: Array, default: () => [] },
     currentFilterValues: { type: Object, default: () => ({}) },
-    pageSizes: { type: Array, default: () => [10, 20, 50, 100] }
+    pageSizes: { type: Array, default: () => [10, 20, 50, 100] },
+    defaultPageSize: { type: Number, default: 0 }
   },
 
   computed: {
@@ -259,6 +273,7 @@ export default {
       editingSchemeIndex: -1,
       editingSchemeName: '',
       editPageSizes: [],
+      editDefaultPageSize: 0,
       customPageSizeInput: 50,
       presetPageSizes: [10, 20, 50, 100, 200, 500, 1000, 2000]
     }
@@ -391,6 +406,7 @@ export default {
       }))
 
       this.editPageSizes = [...(this.pageSizes || [10, 20, 50, 100])].sort((a, b) => a - b)
+      this.editDefaultPageSize = this.defaultPageSize || 0
 
       this.activeTab = 'column'
     },
@@ -589,7 +605,8 @@ export default {
         columnWidths,
         filterFields,
         filterSchemes,
-        pageSizes: [...this.editPageSizes].sort((a, b) => a - b)
+        pageSizes: [...this.editPageSizes].sort((a, b) => a - b),
+        defaultPageSize: this.editDefaultPageSize || 0
       })
       this.drawerVisible = false
     },
@@ -842,6 +859,16 @@ export default {
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
+}
+.pagination-config-default-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.pagination-config-hint {
+  font-size: 12px;
+  color: #909399;
 }
 .pagination-config-current {
   margin-top: 4px;
