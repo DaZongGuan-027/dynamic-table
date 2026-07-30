@@ -17,8 +17,7 @@ export default {
       filterFields: [],
       columnOrder: [],
       filterSchemes: [],
-      columnWidths: {},
-      savedPageSizes: null
+      columnWidths: {}
     }
   },
 
@@ -66,7 +65,7 @@ export default {
           this.columnOrder = this._parseJsonField(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
           this.filterSchemes = this._parseJsonField(config.filterSchemes) || []
           this.columnWidths = this._parseJsonField(config.columnWidths) || {}
-          this.savedPageSizes = this._parseJsonField(config.pageSizes) || null
+
         } else {
           this.resetToDefault()
         }
@@ -93,7 +92,7 @@ export default {
       this.columnOrder = this.fieldMetaList.map(f => f.fieldKey)
       this.filterSchemes = []
       this.columnWidths = {}
-      this.savedPageSizes = null
+
     },
 
     clearStorageConfig() {
@@ -124,7 +123,7 @@ export default {
     },
 
     _buildConfig() {
-      const config = {
+      return {
         menuId: this.menuId,
 
         visibleFields: JSON.stringify(this.visibleFields),
@@ -135,10 +134,6 @@ export default {
         filterSchemes: JSON.stringify(this.filterSchemes),
         columnWidths: JSON.stringify(this.columnWidths)
       }
-      if (this.savedPageSizes) {
-        config.pageSizes = JSON.stringify(this.savedPageSizes)
-      }
-      return config
     },
 
     handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes }) {
@@ -150,7 +145,7 @@ export default {
       this.filterFields = filterFields
       this.filterSchemes = filterSchemes
       if (pageSizes) {
-        this.savedPageSizes = pageSizes
+        this.$set(this.columnWidths, '__pageSizes', pageSizes)
         this.pageSize = pageSizes[0] || 10
       }
       this.saveConfig()

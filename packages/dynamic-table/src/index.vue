@@ -231,7 +231,8 @@ export default {
     },
 
     computedPageSizes() {
-      return this.savedPageSizes && this.savedPageSizes.length > 0 ? this.savedPageSizes : this.pageSizes
+      const saved = this.columnWidths && this.columnWidths['__pageSizes']
+      return saved && saved.length > 0 ? saved : this.pageSizes
     },
 
     hasRowActions() {
