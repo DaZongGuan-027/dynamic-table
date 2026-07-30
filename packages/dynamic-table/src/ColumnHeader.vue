@@ -171,6 +171,7 @@ export default {
       showSearch: false,
       searchValue: '',
       enumSearchOptions: null,
+      enumHeaderFilterQuery: '',
       datePickerOptions: {
         shortcuts: [
           {
@@ -294,15 +295,18 @@ export default {
     },
     handleEnumSelectAll(e) {
       e.stopPropagation()
-      const options = this.enumSearchOptions || this.normalizedEnumValues
-      const allValues = options.map(o => o.value)
+      const all = this.normalizedEnumValues
+      const q = this.enumHeaderFilterQuery || ''
+      const filtered = q ? all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)) : all
+      const filteredValues = filtered.map(o => o.value)
       const current = this.searchValue || []
-      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
-      this.searchValue = isAllSelected ? [] : [...allValues]
+      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
+      this.searchValue = isAllSelected ? [] : [...filteredValues]
     },
     handleEnumRemoteFilter(query) {
       const all = this.normalizedEnumValues
       const q = (query || '').toLowerCase()
+      this.enumHeaderFilterQuery = q
       if (!q) {
         this.enumSearchOptions = null
         return

@@ -312,6 +312,7 @@ export default {
   data() {
     return {
       enumOptionsMap: {},
+      enumFilterQuery: {},
       customFilter: {
         fieldKey: '',
         fieldType: '',
@@ -428,15 +429,18 @@ export default {
     },
     handleSelectAll(meta, e) {
       e.stopPropagation()
-      const options = this.enumOptionsMap[meta.fieldKey] || this.normalizeEnumValues(meta.enumValues)
-      const allValues = options.map(o => o.value)
+      const all = this.normalizeEnumValues(meta.enumValues)
+      const q = this.enumFilterQuery[meta.fieldKey] || ''
+      const filtered = q ? all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)) : all
+      const filteredValues = filtered.map(o => o.value)
       const current = this.filterValues[meta.fieldKey] || []
-      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
-      this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...allValues])
+      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
+      this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...filteredValues])
     },
     handleEnumRemoteFilter(fieldKey, enumValues, query) {
       const all = this.normalizeEnumValues(enumValues)
       const q = (query || '').toLowerCase()
+      this.$set(this.enumFilterQuery, fieldKey, q)
       if (!q) {
         this.$set(this.enumOptionsMap, fieldKey, all)
         return
@@ -471,11 +475,13 @@ export default {
     },
     handleCustomSelectAll(e) {
       e.stopPropagation()
-      const options = this.enumOptionsMap['__custom__'] || this.customFilter.enumOptions
-      const allValues = options.map(o => o.value)
+      const all = this.customFilter.enumOptions || []
+      const q = this.enumFilterQuery['__custom__'] || ''
+      const filtered = q ? all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)) : all
+      const filteredValues = filtered.map(o => o.value)
       const current = this.customFilter.value || []
-      const isAllSelected = allValues.length > 0 && allValues.every(v => current.includes(v))
-      this.customFilter.value = isAllSelected ? [] : [...allValues]
+      const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
+      this.customFilter.value = isAllSelected ? [] : [...filteredValues]
     },
     handleCustomNumberInput() {
       const cf = this.customFilter
