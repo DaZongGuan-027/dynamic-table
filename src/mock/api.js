@@ -82,17 +82,43 @@ function _queryData(dataSource, params = {}) {
           const val = params.filters[fieldKey]
           if (val === null || val === undefined || val === '') return
 
-          if (typeof val === 'object') {
-            if (val.min !== null && val.min !== undefined && val.min !== '') {
+          if (typeof val === 'object' && !Array.isArray(val)) {
+            if (val.range !== undefined && Array.isArray(val.range) && val.range.length === 2) {
+              filtered = filtered.filter(row => row[fieldKey] >= val.range[0] && row[fieldKey] <= val.range[1])
+            } else if (val.operator !== undefined && val.value !== '' && val.value !== null && val.value !== undefined) {
+              const op = val.operator
+              const fv = val.value
+              switch (op) {
+                case 'eq':
+                  filtered = filtered.filter(row => String(row[fieldKey]) === String(fv)); break
+                case 'neq':
+                  filtered = filtered.filter(row => String(row[fieldKey]) !== String(fv)); break
+                case 'contains':
+                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().includes(String(fv).toLowerCase())); break
+                case 'notContains':
+                  filtered = filtered.filter(row => !String(row[fieldKey] || '').toLowerCase().includes(String(fv).toLowerCase())); break
+                case 'startsWith':
+                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().startsWith(String(fv).toLowerCase())); break
+                case 'endsWith':
+                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().endsWith(String(fv).toLowerCase())); break
+                case 'gt':
+                  filtered = filtered.filter(row => Number(row[fieldKey]) > Number(fv)); break
+                case 'lt':
+                  filtered = filtered.filter(row => Number(row[fieldKey]) < Number(fv)); break
+                case 'gte':
+                  filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(fv)); break
+                case 'lte':
+                  filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(fv)); break
+                default:
+                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().includes(String(fv).toLowerCase()))
+              }
+            } else if (val.min !== null && val.min !== undefined && val.min !== '') {
               filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(val.min))
-            }
-            if (val.max !== null && val.max !== undefined && val.max !== '') {
+            } else if (val.max !== null && val.max !== undefined && val.max !== '') {
               filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(val.max))
-            }
-            if (val.start) {
+            } else if (val.start) {
               filtered = filtered.filter(row => row[fieldKey] >= val.start)
-            }
-            if (val.end) {
+            } else if (val.end) {
               filtered = filtered.filter(row => row[fieldKey] <= val.end + ' 23:59:59')
             }
           } else if (Array.isArray(val)) {
