@@ -43,6 +43,7 @@
             collapse-tags
             filterable
             :filter-method="setEnumSearchQuery"
+            @visible-change="(v) => !v && setEnumSearchQuery('')"
             :popper-append-to-body="popperAppendToBody"
             style="width: 100%"
           >
@@ -304,7 +305,7 @@ export default {
       this.searchValue = isAllSelected ? [] : [...filteredValues]
     },
     setEnumSearchQuery(query) {
-      this.enumSearchQuery = query || ''
+      this.enumSearchQuery = (query || '').toLowerCase()
     },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue

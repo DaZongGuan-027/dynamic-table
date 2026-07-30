@@ -32,6 +32,7 @@
                     filterable
                     :filter-method="(q) => setEnumQuery(meta.fieldKey, q)"
                     :popper-append-to-body="popperAppendToBody"
+                    @visible-change="(v) => !v && setEnumQuery(meta.fieldKey, '')"
                   >
                     <el-option
                       label="全选"
@@ -160,6 +161,7 @@
                   collapse-tags
                   filterable
                   :filter-method="(q) => setEnumQuery('__custom__', q)"
+                  @visible-change="(v) => !v && setEnumQuery('__custom__', '')"
                   size="small"
                   :popper-append-to-body="popperAppendToBody"
                   style="flex: 1; min-width: 0"
@@ -431,7 +433,7 @@ export default {
       this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...filteredValues])
     },
     setEnumQuery(fieldKey, query) {
-      this.$set(this.enumFilterQuery, fieldKey, query || '')
+      this.$set(this.enumFilterQuery, fieldKey, (query || '').toLowerCase())
     },
     getFilteredEnumOptions(meta) {
       const all = this.normalizeEnumValues(meta.enumValues)
