@@ -44,7 +44,7 @@
             filterable
             remote
             :remote-method="handleEnumRemoteFilter"
-            @visible-change="(v) => !v && handleEnumRemoteFilter('')"
+            @visible-change="(v) => !v && resetEnumHeaderFilter()"
             :popper-append-to-body="popperAppendToBody"
             style="width: 100%"
           >
@@ -306,12 +306,18 @@ export default {
     handleEnumRemoteFilter(query) {
       const all = this.normalizedEnumValues
       const q = (query || '').toLowerCase()
-      this.enumHeaderFilterQuery = q
+      if (q) {
+        this.enumHeaderFilterQuery = q
+      }
       if (!q) {
         this.enumSearchOptions = null
         return
       }
       this.enumSearchOptions = all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
+    },
+    resetEnumHeaderFilter() {
+      this.enumHeaderFilterQuery = ''
+      this.enumSearchOptions = null
     },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue

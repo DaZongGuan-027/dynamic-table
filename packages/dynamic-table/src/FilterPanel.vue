@@ -33,7 +33,7 @@
                     remote
                     :remote-method="(q) => handleEnumRemoteFilter(meta.fieldKey, meta.enumValues, q)"
                     :popper-append-to-body="popperAppendToBody"
-                    @visible-change="(v) => !v && handleEnumRemoteFilter(meta.fieldKey, meta.enumValues, '')"
+                    @visible-change="(v) => !v && resetEnumFilter(meta.fieldKey, meta.enumValues)"
                   >
                     <el-option
                       label="全选"
@@ -163,7 +163,7 @@
                   filterable
                   remote
                   :remote-method="(q) => handleEnumRemoteFilter('__custom__', customFilter.enumOptions, q)"
-                  @visible-change="(v) => !v && handleEnumRemoteFilter('__custom__', customFilter.enumOptions, '')"
+                  @visible-change="(v) => !v && resetEnumFilter('__custom__', customFilter.enumOptions)"
                   size="small"
                   :popper-append-to-body="popperAppendToBody"
                   style="flex: 1; min-width: 0"
@@ -440,12 +440,18 @@ export default {
     handleEnumRemoteFilter(fieldKey, enumValues, query) {
       const all = this.normalizeEnumValues(enumValues)
       const q = (query || '').toLowerCase()
-      this.$set(this.enumFilterQuery, fieldKey, q)
+      if (q) {
+        this.$set(this.enumFilterQuery, fieldKey, q)
+      }
       if (!q) {
         this.$set(this.enumOptionsMap, fieldKey, all)
         return
       }
       this.$set(this.enumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)))
+    },
+    resetEnumFilter(fieldKey, enumValues) {
+      this.$set(this.enumFilterQuery, fieldKey, '')
+      this.$set(this.enumOptionsMap, fieldKey, this.normalizeEnumValues(enumValues))
     },
     handleCustomFieldChange() {
       const cf = this.customFilter
