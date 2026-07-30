@@ -42,8 +42,8 @@
             clearable
             collapse-tags
             filterable
-            :filter-method="setEnumSearchQuery"
-            @visible-change="(v) => !v && setEnumSearchQuery('')"
+            :filter-method="handleEnumSearchFilter"
+            @visible-change="(v) => !v && handleEnumSearchFilter('')"
             :popper-append-to-body="popperAppendToBody"
             style="width: 100%"
           >
@@ -53,7 +53,7 @@
               @click.native="handleEnumSelectAll($event)"
             />
             <el-option
-              v-for="opt in filteredEnumValues"
+              v-for="opt in (filteredEnumValues || normalizedEnumValues)"
               :key="opt.value"
               :label="opt.label"
               :value="opt.value"
@@ -169,7 +169,7 @@ export default {
       popoverVisible: false,
       showSearch: false,
       searchValue: '',
-      enumSearchQuery: '',
+      filteredEnumValues: null,
       datePickerOptions: {
         shortcuts: [
           {
@@ -278,13 +278,7 @@ export default {
     hasEnumOptions() {
       return this.normalizedEnumValues.length > 0
 
-    },
 
-    filteredEnumValues() {
-      const all = this.normalizedEnumValues
-      const query = (this.enumSearchQuery || '').toLowerCase()
-      if (!query) return all
-      return all.filter(o => (o.label + '').toLowerCase().includes(query) || (o.value + '').toLowerCase().includes(query))
     }
   },
 
@@ -299,13 +293,19 @@ export default {
     },
     handleEnumSelectAll(e) {
       e.stopPropagation()
-      const filteredValues = this.filteredEnumValues.map(o => o.value)
+      const filtered = this.filteredEnumValues || this.normalizedEnumValues
+      const filteredValues = filtered.map(o => o.value)
       const current = this.searchValue || []
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
       this.searchValue = isAllSelected ? [] : [...filteredValues]
     },
-    setEnumSearchQuery(query) {
-      this.enumSearchQuery = (query || '').toLowerCase()
+    handleEnumSearchFilter(query) {
+      const q = (query || '').toLowerCase()
+      if (!q) {
+        this.filteredEnumValues = null
+        return
+      }
+      this.filteredEnumValues = this.normalizedEnumValues.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
     },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue
