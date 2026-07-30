@@ -160,6 +160,49 @@
           </div>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane label="分页配置" name="pagination">
+        <div class="tab-tip">
+          <i class="el-icon-info"></i>
+          设置默认每页条数，也可自定义，最大不超过2000
+        </div>
+        <div class="pagination-config">
+          <div class="pagination-config-label">默认每页条数</div>
+          <div class="pagination-config-options">
+            <div
+              v-for="opt in presetPageSizes"
+              :key="opt"
+              class="page-size-chip"
+              :class="{ 'is-active': editPageSizes.includes(opt), 'is-custom': !presetPageSizes.includes(opt) }"
+              @click="togglePresetPageSize(opt)"
+            >{{ opt }}</div>
+          </div>
+          <div class="pagination-config-custom">
+            <el-input-number
+              v-model="customPageSizeInput"
+              size="small"
+              :min="1"
+              :max="2000"
+              :step="10"
+              controls-position="right"
+              placeholder="自定义条数"
+              style="width: 160px"
+            />
+            <el-button size="small" type="primary" plain @click="addCustomPageSize" :disabled="!customPageSizeInput || editPageSizes.includes(customPageSizeInput)">添加</el-button>
+          </div>
+          <div class="pagination-config-current" v-if="editPageSizes.length > 0">
+            <div class="pagination-config-label">已选条数选项（点击移除）</div>
+            <div class="pagination-config-options">
+              <div
+                v-for="opt in editPageSizes"
+                :key="opt"
+                class="page-size-chip is-active"
+                @click="removePageSize(opt)"
+              >{{ opt }} <i class="el-icon-close"></i></div>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
 
     <div class="drawer-footer">
@@ -190,7 +233,8 @@ export default {
     filterFields: { type: Array, default: () => [] },
     columnOrder: { type: Array, default: () => [] },
     filterSchemes: { type: Array, default: () => [] },
-    currentFilterValues: { type: Object, default: () => ({}) }
+    currentFilterValues: { type: Object, default: () => ({}) },
+    pageSizes: { type: Array, default: () => [10, 20, 50, 100] }
   },
 
   computed: {
@@ -213,7 +257,10 @@ export default {
       editFilterList: [],
       editSchemes: [],
       editingSchemeIndex: -1,
-      editingSchemeName: ''
+      editingSchemeName: '',
+      editPageSizes: [],
+      customPageSizeInput: 50,
+      presetPageSizes: [10, 20, 50, 100, 200, 500, 1000, 2000]
     }
   },
 
@@ -343,6 +390,8 @@ export default {
         filterValues: JSON.parse(JSON.stringify(s.filterValues || {}))
       }))
 
+      this.editPageSizes = [...(this.pageSizes || [10, 20, 50, 100])].sort((a, b) => a - b)
+
       this.activeTab = 'column'
     },
 
@@ -399,6 +448,30 @@ export default {
     },
 
     handleFilterCheckChange(item) {
+    },
+
+    togglePresetPageSize(opt) {
+      const idx = this.editPageSizes.indexOf(opt)
+      if (idx >= 0) {
+        this.editPageSizes.splice(idx, 1)
+      } else {
+        this.editPageSizes.push(opt)
+        this.editPageSizes.sort((a, b) => a - b)
+      }
+    },
+
+    addCustomPageSize() {
+      const val = this.customPageSizeInput
+      if (!val || val < 1 || val > 2000) return
+      if (this.editPageSizes.includes(val)) return
+      this.editPageSizes.push(val)
+      this.editPageSizes.sort((a, b) => a - b)
+      this.customPageSizeInput = 50
+    },
+
+    removePageSize(opt) {
+      const idx = this.editPageSizes.indexOf(opt)
+      if (idx >= 0) this.editPageSizes.splice(idx, 1)
     },
 
     addScheme() {
@@ -515,7 +588,8 @@ export default {
         frozenPositions,
         columnWidths,
         filterFields,
-        filterSchemes
+        filterSchemes,
+        pageSizes: [...this.editPageSizes].sort((a, b) => a - b)
       })
       this.drawerVisible = false
     },
@@ -722,5 +796,54 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.pagination-config {
+  padding-top: 4px;
+}
+.pagination-config-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.pagination-config-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.page-size-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #606266;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+.page-size-chip:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+.page-size-chip.is-active {
+  background: #ecf5ff;
+  border-color: #409eff;
+  color: #409eff;
+}
+.page-size-chip .el-icon-close {
+  margin-left: 4px;
+  font-size: 12px;
+}
+.pagination-config-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.pagination-config-current {
+  margin-top: 4px;
 }
 </style>

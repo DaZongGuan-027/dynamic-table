@@ -17,7 +17,8 @@ export default {
       filterFields: [],
       columnOrder: [],
       filterSchemes: [],
-      columnWidths: {}
+      columnWidths: {},
+      savedPageSizes: null
     }
   },
 
@@ -65,6 +66,7 @@ export default {
           this.columnOrder = this._parseJsonField(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
           this.filterSchemes = this._parseJsonField(config.filterSchemes) || []
           this.columnWidths = this._parseJsonField(config.columnWidths) || {}
+          this.savedPageSizes = this._parseJsonField(config.pageSizes) || null
         } else {
           this.resetToDefault()
         }
@@ -91,6 +93,7 @@ export default {
       this.columnOrder = this.fieldMetaList.map(f => f.fieldKey)
       this.filterSchemes = []
       this.columnWidths = {}
+      this.savedPageSizes = null
     },
 
     clearStorageConfig() {
@@ -121,7 +124,7 @@ export default {
     },
 
     _buildConfig() {
-      return {
+      const config = {
         menuId: this.menuId,
 
         visibleFields: JSON.stringify(this.visibleFields),
@@ -132,9 +135,13 @@ export default {
         filterSchemes: JSON.stringify(this.filterSchemes),
         columnWidths: JSON.stringify(this.columnWidths)
       }
+      if (this.savedPageSizes) {
+        config.pageSizes = JSON.stringify(this.savedPageSizes)
+      }
+      return config
     },
 
-    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes }) {
+    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes }) {
       this.visibleFields = visibleFields
       this.columnOrder = columnOrder
       this.frozenFields = frozenFields
@@ -142,6 +149,10 @@ export default {
       this.columnWidths = columnWidths || {}
       this.filterFields = filterFields
       this.filterSchemes = filterSchemes
+      if (pageSizes) {
+        this.savedPageSizes = pageSizes
+        this.pageSize = pageSizes[0] || 10
+      }
       this.saveConfig()
       this.tableKey++
       this.$nextTick(() => {

@@ -133,7 +133,7 @@
     <div class="table-pagination" v-if="showPagination">
       <el-pagination
         :current-page="currentPage"
-        :page-sizes="pageSizes"
+        :page-sizes="computedPageSizes"
         :page-size="pageSize"
         :total="total"
         layout="total, sizes, prev, pager, next, jumper"
@@ -153,6 +153,7 @@
       :column-order="columnOrder"
       :filter-schemes="filterSchemes"
       :current-filter-values="filterValues"
+      :page-sizes="computedPageSizes"
 
       @confirm="handleConfigChange"
       @reset-default="handleResetDefault"
@@ -227,6 +228,10 @@ export default {
     computedTableHeight() {
       if (this.tableHeight) return this.tableHeight
       return this.selfAdaptiveHeight
+    },
+
+    computedPageSizes() {
+      return this.savedPageSizes && this.savedPageSizes.length > 0 ? this.savedPageSizes : this.pageSizes
     },
 
     hasRowActions() {
