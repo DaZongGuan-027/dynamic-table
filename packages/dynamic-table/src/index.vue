@@ -335,12 +335,14 @@ export default {
     this.calcTableHeight()
     this._resizeHandler = () => this.calcTableHeight()
     window.addEventListener('resize', this._resizeHandler)
+    this._setupResizeObserver()
   },
 
   beforeDestroy() {
     if (this._resizeHandler) {
       window.removeEventListener('resize', this._resizeHandler)
     }
+    this._teardownResizeObserver()
   },
 
   methods: {
@@ -616,21 +618,60 @@ export default {
       return this.$refs.elTable
     },
 
+    _getOuterHeight(el) {
+      if (!el) return 0
+      const style = window.getComputedStyle(el)
+      return el.offsetHeight + parseFloat(style.marginTop || 0) + parseFloat(style.marginBottom || 0)
+    },
+
     calcTableHeight() {
       if (this.tableHeight) return
       this.$nextTick(() => {
         const el = this.$el
         if (!el) return
-        const rect = el.getBoundingClientRect()
+        const containerStyle = window.getComputedStyle(el)
+        const paddingTop = parseFloat(containerStyle.paddingTop || 0)
+        const paddingBottom = parseFloat(containerStyle.paddingBottom || 0)
         const toolbar = el.querySelector('.table-toolbar')
         const pagination = el.querySelector('.table-pagination')
         const filterPanel = el.querySelector('.filter-panel')
-        const toolbarH = toolbar ? toolbar.offsetHeight + 12 : 0
-        const paginationH = pagination ? pagination.offsetHeight + 12 : 0
-        const filterH = filterPanel ? filterPanel.offsetHeight + 12 : 0
-        const totalH = rect.height - toolbarH - paginationH - filterH - 32
+        const toolbarH = this._getOuterHeight(toolbar)
+        const paginationH = this._getOuterHeight(pagination)
+        const filterH = this._getOuterHeight(filterPanel)
+        const totalH = el.offsetHeight - paddingTop - paddingBottom - toolbarH - paginationH - filterH
         this.selfAdaptiveHeight = Math.max(totalH, 200)
+        this.$nextTick(() => {
+          if (this.$refs.elTable) {
+            this.$refs.elTable.doLayout()
+          }
+        })
       })
+    },
+
+    _setupResizeObserver() {
+      if (typeof ResizeObserver === 'undefined') return
+      this._resizeObserver = new ResizeObserver(() => {
+        this.calcTableHeight()
+      })
+      this.$nextTick(() => {
+        const el = this.$el
+        if (!el) return
+        const targets = [
+          el.querySelector('.filter-panel'),
+          el.querySelector('.table-toolbar'),
+          el.querySelector('.table-pagination')
+        ]
+        targets.forEach(target => {
+          if (target) this._resizeObserver.observe(target)
+        })
+      })
+    },
+
+    _teardownResizeObserver() {
+      if (this._resizeObserver) {
+        this._resizeObserver.disconnect()
+        this._resizeObserver = null
+      }
     },
 
     handleColumnSortChange(fieldKey, order) {
