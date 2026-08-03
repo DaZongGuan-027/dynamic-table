@@ -34,19 +34,20 @@
       </div>
     </div>
 
-    <el-table
-      ref="elTable"
-      :key="tableKey"
-      :data="tableData"
-      :border="border"
-      :stripe="stripe"
-      :row-key="rowKey"
-      :height="computedTableHeight"
-      v-loading="tableLoading"
+    <div class="table-main">
+      <el-table
+        ref="elTable"
+        :key="tableKey"
+        :data="tableData"
+        :border="border"
+        :stripe="stripe"
+        :row-key="rowKey"
+        :height="computedTableHeight"
+        v-loading="tableLoading"
 
-      @selection-change="handleSelectionChange"
-      style="width: 100%"
-    >
+        @selection-change="handleSelectionChange"
+        style="width: 100%"
+      >
       <template v-for="fieldKey in allColumnOrder">
         <el-table-column
           v-if="fieldKey === '__selection' && hasSelection && isSpecialVisible('__selection')"
@@ -129,6 +130,7 @@
         </el-table-column>
       </template>
     </el-table>
+    </div>
 
     <div class="table-pagination" v-if="showPagination">
       <el-pagination
@@ -218,7 +220,7 @@ export default {
       pageSize: 10,
       currentSortBy: '',
       currentSortOrder: '',
-      selfAdaptiveHeight: 500,
+
       columnSearchValues: {},
       activeSchemeIndex: -1,
       _lastCustomFilterValues: {}
@@ -228,7 +230,7 @@ export default {
   computed: {
     computedTableHeight() {
       if (this.tableHeight) return this.tableHeight
-      return this.selfAdaptiveHeight
+      return '100%'
     },
 
     computedPageSizes() {
@@ -332,17 +334,18 @@ export default {
   },
 
   mounted() {
-    this.calcTableHeight()
-    this._resizeHandler = () => this.calcTableHeight()
-    window.addEventListener('resize', this._resizeHandler)
-    this._setupResizeObserver()
+    this.$nextTick(() => {
+      if (this.$refs.elTable) this.$refs.elTable.doLayout()
+    })
+  },
+
+  activated() {
+    this.$nextTick(() => {
+      if (this.$refs.elTable) this.$refs.elTable.doLayout()
+    })
   },
 
   beforeDestroy() {
-    if (this._resizeHandler) {
-      window.removeEventListener('resize', this._resizeHandler)
-    }
-    this._teardownResizeObserver()
   },
 
   methods: {
@@ -371,6 +374,11 @@ export default {
         const result = await this.fetchDataFn(params)
         this.tableData = result.list || []
         this.total = result.total || 0
+        this.$nextTick(() => {
+          this.$nextTick(() => {
+            if (this.$refs.elTable) this.$refs.elTable.doLayout()
+          })
+        })
       } catch (e) {
         console.error('获取表格数据失败:', e)
         this.tableData = []
@@ -477,7 +485,7 @@ export default {
       this.scrollFilterToTop()
       this.tableKey++
       this.$nextTick(() => {
-        this.calcTableHeight()
+        this.doLayout()
         this.fetchData()
       })
       this.$message.success('已还原为默认配置')
@@ -618,60 +626,10 @@ export default {
       return this.$refs.elTable
     },
 
-    _getOuterHeight(el) {
-      if (!el) return 0
-      const style = window.getComputedStyle(el)
-      return el.offsetHeight + parseFloat(style.marginTop || 0) + parseFloat(style.marginBottom || 0)
-    },
-
-    calcTableHeight() {
-      if (this.tableHeight) return
+    doLayout() {
       this.$nextTick(() => {
-        const el = this.$el
-        if (!el) return
-        const containerStyle = window.getComputedStyle(el)
-        const paddingTop = parseFloat(containerStyle.paddingTop || 0)
-        const paddingBottom = parseFloat(containerStyle.paddingBottom || 0)
-        const toolbar = el.querySelector('.table-toolbar')
-        const pagination = el.querySelector('.table-pagination')
-        const filterPanel = el.querySelector('.filter-panel')
-        const toolbarH = this._getOuterHeight(toolbar)
-        const paginationH = this._getOuterHeight(pagination)
-        const filterH = this._getOuterHeight(filterPanel)
-        const totalH = el.offsetHeight - paddingTop - paddingBottom - toolbarH - paginationH - filterH
-        this.selfAdaptiveHeight = Math.max(totalH, 200)
-        this.$nextTick(() => {
-          if (this.$refs.elTable) {
-            this.$refs.elTable.doLayout()
-          }
-        })
+        if (this.$refs.elTable) this.$refs.elTable.doLayout()
       })
-    },
-
-    _setupResizeObserver() {
-      if (typeof ResizeObserver === 'undefined') return
-      this._resizeObserver = new ResizeObserver(() => {
-        this.calcTableHeight()
-      })
-      this.$nextTick(() => {
-        const el = this.$el
-        if (!el) return
-        const targets = [
-          el.querySelector('.filter-panel'),
-          el.querySelector('.table-toolbar'),
-          el.querySelector('.table-pagination')
-        ]
-        targets.forEach(target => {
-          if (target) this._resizeObserver.observe(target)
-        })
-      })
-    },
-
-    _teardownResizeObserver() {
-      if (this._resizeObserver) {
-        this._resizeObserver.disconnect()
-        this._resizeObserver = null
-      }
     },
 
     handleColumnSortChange(fieldKey, order) {
@@ -707,6 +665,7 @@ export default {
   background: #fff;
   border-radius: 4px;
   height: 100%;
+  min-height: 0;
   box-sizing: border-box;
 }
 .dynamic-table >>> .el-table th {
@@ -736,6 +695,11 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.table-main {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .table-pagination {
   display: flex;

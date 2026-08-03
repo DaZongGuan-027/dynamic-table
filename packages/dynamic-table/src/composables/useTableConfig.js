@@ -169,7 +169,7 @@ export default {
       this.saveConfig()
       this.tableKey++
       this.$nextTick(() => {
-        this.calcTableHeight()
+        this.doLayout()
         this.fetchData()
       })
     },

@@ -127,8 +127,8 @@ export default {
     toggleFilterExpand() {
       this.filterExpanded = !this.filterExpanded
       this.$nextTick(() => {
-        if (typeof this.calcTableHeight === 'function') {
-          this.calcTableHeight()
+        if (typeof this.doLayout === 'function') {
+          this.doLayout()
         }
       })
     },
