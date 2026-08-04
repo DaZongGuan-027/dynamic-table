@@ -58,7 +58,7 @@ export default {
           const config = await this.loadConfigFn(this.menuId)
         if (config) {
           this.config = config
-          this.visibleFields = this._parseJsonField(config.visibleFields) || this.fieldMetaList.map(f => f.fieldKey)
+          this.visibleFields = this._parseJsonField(config.visibleFields) || this._getDefaultVisibleFields()
           this.frozenFields = this._parseJsonField(config.frozenFields) || []
           this.frozenPositions = this._parseJsonField(config.frozenPositions) || {}
           this.filterFields = this._parseJsonField(config.filterFields) || []
@@ -95,8 +95,15 @@ export default {
       }
     },
 
+    _getDefaultVisibleFields() {
+      if (this.defaultVisibleFields && this.defaultVisibleFields.length > 0) {
+        return [...this.defaultVisibleFields]
+      }
+      return this.fieldMetaList.map(f => f.fieldKey)
+    },
+
     resetToDefault() {
-      this.visibleFields = this.fieldMetaList.map(f => f.fieldKey)
+      this.visibleFields = this._getDefaultVisibleFields()
       this.frozenFields = []
       this.frozenPositions = {}
       this.filterFields = []

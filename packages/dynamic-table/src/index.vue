@@ -201,6 +201,8 @@ export default {
 
     actionColumnWidth: { type: [String, Number], default: 150 },
 
+    defaultVisibleFields: { type: Array, default: () => [] },
+
     filterPopperAppendToBody: { type: Boolean, default: true },
     pageParamName: { type: String, default: 'page' },
     pageSizeParamName: { type: String, default: 'pageSize' },
