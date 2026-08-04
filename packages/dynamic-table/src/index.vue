@@ -45,7 +45,7 @@
         :row-key="getRowKey"
         :row-class-name="getRowClassName"
         :height="computedTableHeight"
-        v-loading="tableLoading || summaryLoading"
+        v-loading="tableLoading"
 
         @selection-change="handleSelectionChange"
         style="width: 100%"
@@ -130,7 +130,7 @@
           </template>
           <template slot-scope="scope">
             <template v-if="scope.row.__isSummaryRow">
-              <span v-if="isFirstNonSummableField(fieldKey)" class="summary-toggle" @click="toggleSummaryMode">{{ summaryLabel }}</span>
+              <span v-if="isFirstNonSummableField(fieldKey)" class="summary-label">合计</span>
               <span v-else-if="summableFieldKeys.includes(fieldKey)">{{ _formatCurrency(scope.row[fieldKey]) }}</span>
             </template>
             <slot
@@ -228,7 +228,7 @@ export default {
     cacheFilters: { type: Boolean, default: false },
 
     showSummary: { type: Boolean, default: false },
-    fetchSummaryFn: { type: Function, default: null },
+
     showUniversalFilter: { type: Boolean, default: true }
   },
 
@@ -246,10 +246,7 @@ export default {
 
       columnSearchValues: {},
       activeSchemeIndex: -1,
-      _lastCustomFilterValues: {},
-      summaryMode: 'page',
-      allSummaryData: null,
-      summaryLoading: false
+      _lastCustomFilterValues: {}
     }
   },
 
@@ -383,20 +380,11 @@ export default {
       return sums
     },
 
-    currentSummaryData() {
-      if (this.summaryMode === 'all' && this.allSummaryData) return this.allSummaryData
-      return this.pageSummaryData
-    },
-
-    summaryLabel() {
-      return this.summaryMode === 'all' ? '合计：所有页' : '合计：当前页'
-    },
-
     displayData() {
       if (!this.computedShowSummary || this.tableData.length === 0) return this.tableData
       const summaryRow = { __isSummaryRow: true }
       this.summableFieldKeys.forEach(key => {
-        summaryRow[key] = this.currentSummaryData[key] || 0
+        summaryRow[key] = this.pageSummaryData[key] || 0
       })
       return [summaryRow, ...this.tableData]
     }
@@ -446,47 +434,6 @@ export default {
       return fieldKey === firstKey
     },
 
-    async toggleSummaryMode() {
-      if (this.summaryMode === 'page') {
-        if (this.fetchSummaryFn) {
-          this.summaryLoading = true
-          try {
-            const mergedFilters = { ...this.activeFilters }
-            Object.keys(this.columnSearchValues).forEach(key => {
-              const val = this.columnSearchValues[key]
-              if (val !== null && val !== undefined && val !== '') {
-                mergedFilters[key] = val
-              }
-            })
-            if (this._lastCustomFilterValues) {
-              Object.keys(this._lastCustomFilterValues).forEach(key => {
-                mergedFilters[key] = this._lastCustomFilterValues[key]
-              })
-            }
-            const params = {
-              filters: mergedFilters,
-              sortBy: this.currentSortBy,
-              sortOrder: this.currentSortOrder
-            }
-            const result = await this.fetchSummaryFn(params)
-            this.allSummaryData = result || {}
-            this.summaryMode = 'all'
-          } catch (e) {
-            console.error('获取合计数据失败:', e)
-          } finally {
-            this.summaryLoading = false
-          }
-        } else {
-          this.summaryMode = 'all'
-        }
-      } else {
-        this.summaryLoading = true
-        this.summaryMode = 'page'
-        this.$nextTick(() => {
-          this.summaryLoading = false
-        })
-      }
-    },
 
     async fetchData() {
       this.tableLoading = true
@@ -513,8 +460,7 @@ export default {
         const result = await this.fetchDataFn(params)
         this.tableData = result.list || []
         this.total = result.total || 0
-        this.summaryMode = 'page'
-        this.allSummaryData = null
+
         this.$nextTick(() => {
           this.$nextTick(() => {
             if (this.$refs.elTable) this.$refs.elTable.doLayout()
@@ -856,13 +802,9 @@ export default {
 .dynamic-table >>> .el-table .summary-row td {
   background: #fafafa !important;
 }
-.summary-toggle {
-  cursor: pointer;
-  color: #409eff;
+.summary-label {
   font-size: 12px;
+  color: #606266;
   white-space: nowrap;
-}
-.summary-toggle:hover {
-  color: #66b1ff;
 }
 </style>
