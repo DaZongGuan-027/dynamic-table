@@ -45,7 +45,7 @@
         :row-key="getRowKey"
         :row-class-name="getRowClassName"
         :height="computedTableHeight"
-        v-loading="tableLoading"
+        v-loading="tableLoading || summaryLoading"
 
         @selection-change="handleSelectionChange"
         style="width: 100%"
