@@ -480,7 +480,11 @@ export default {
           this.summaryMode = 'all'
         }
       } else {
+        this.summaryLoading = true
         this.summaryMode = 'page'
+        this.$nextTick(() => {
+          this.summaryLoading = false
+        })
       }
     },
 
