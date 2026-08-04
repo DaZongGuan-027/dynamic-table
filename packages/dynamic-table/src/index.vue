@@ -72,7 +72,7 @@
           align="center"
         >
           <template slot-scope="scope">
-            <span v-if="scope.row.__isSummaryRow" class="summary-toggle" @click="toggleSummaryMode">{{ summaryLabel }}</span>
+            <span v-if="scope.row.__isSummaryRow"></span>
             <span v-else>{{ scope.$index }}</span>
           </template>
         </el-table-column>
@@ -130,7 +130,7 @@
           </template>
           <template slot-scope="scope">
             <template v-if="scope.row.__isSummaryRow">
-              <span v-if="!hasIndex && isFirstVisibleDataField(fieldKey)" class="summary-toggle" @click="toggleSummaryMode">{{ summaryLabel }}</span>
+              <span v-if="isFirstNonSummableField(fieldKey)" class="summary-toggle" @click="toggleSummaryMode">{{ summaryLabel }}</span>
               <span v-else-if="summableFieldKeys.includes(fieldKey)">{{ _formatCurrency(scope.row[fieldKey]) }}</span>
             </template>
             <slot
@@ -438,8 +438,11 @@ export default {
       return !row.__isSummaryRow
     },
 
-    isFirstVisibleDataField(fieldKey) {
-      const firstKey = this.orderedVisibleFields.find(k => this.isDataField(k))
+    isFirstNonSummableField(fieldKey) {
+      const firstKey = this.orderedVisibleFields.find(k => {
+        if (!this.isDataField(k)) return false
+        return !this.summableFieldKeys.includes(k)
+      })
       return fieldKey === firstKey
     },
 
