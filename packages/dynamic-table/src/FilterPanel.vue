@@ -133,7 +133,7 @@
           </template>
         </div>
 
-        <div class="custom-filter-section" v-if="allDataFields.length > 0">
+        <div class="custom-filter-section" v-if="showUniversalFilter && allDataFields.length > 0">
           <div class="custom-filter-row">
             <el-select
               v-model="customFilter.fieldKey"
@@ -306,7 +306,8 @@ export default {
     expanded: { type: Boolean, default: true },
     filterSchemes: { type: Array, default: () => [] },
     activeSchemeIndex: { type: Number, default: -1 },
-    popperAppendToBody: { type: Boolean, default: true }
+    popperAppendToBody: { type: Boolean, default: true },
+    showUniversalFilter: { type: Boolean, default: true }
   },
 
   data() {

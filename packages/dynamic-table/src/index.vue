@@ -2,7 +2,7 @@
   <div class="dynamic-table" v-loading="configLoading">
 
     <filter-panel
-      v-if="activeFilterMetaList.length > 0 || allDataFields.length > 0"
+      v-if="activeFilterMetaList.length > 0 || (computedShowUniversalFilter && allDataFields.length > 0)"
       ref="filterPanel"
       :filter-meta-list="activeFilterMetaList"
       :all-field-meta-list="fieldMetaList"
@@ -11,6 +11,7 @@
       :filter-schemes="filterSchemes"
       :active-scheme-index="activeSchemeIndex"
       :popper-append-to-body="filterPopperAppendToBody"
+      :show-universal-filter="computedShowUniversalFilter"
       @toggle-expand="toggleFilterExpand"
       @apply="applyFilters"
       @reset="resetFilters"
@@ -171,6 +172,8 @@
       :current-filter-values="filterValues"
       :page-sizes="computedPageSizes"
       :default-page-size="computedDefaultPageSize"
+      :show-summary="computedShowSummary"
+      :show-universal-filter="computedShowUniversalFilter"
 
       @confirm="handleConfigChange"
       @reset-default="handleResetDefault"
@@ -225,7 +228,8 @@ export default {
     cacheFilters: { type: Boolean, default: false },
 
     showSummary: { type: Boolean, default: false },
-    fetchSummaryFn: { type: Function, default: null }
+    fetchSummaryFn: { type: Function, default: null },
+    showUniversalFilter: { type: Boolean, default: true }
   },
 
   data() {
@@ -253,6 +257,16 @@ export default {
     computedTableHeight() {
       if (this.tableHeight) return this.tableHeight
       return '100%'
+    },
+
+    computedShowSummary() {
+      const saved = this.columnWidths && this.columnWidths['__showSummary']
+      return saved !== undefined ? saved : this.showSummary
+    },
+
+    computedShowUniversalFilter() {
+      const saved = this.columnWidths && this.columnWidths['__showUniversalFilter']
+      return saved !== undefined ? saved : this.showUniversalFilter
     },
 
     computedPageSizes() {
@@ -379,7 +393,7 @@ export default {
     },
 
     displayData() {
-      if (!this.showSummary || this.tableData.length === 0) return this.tableData
+      if (!this.computedShowSummary || this.tableData.length === 0) return this.tableData
       const summaryRow = { __isSummaryRow: true }
       this.summableFieldKeys.forEach(key => {
         summaryRow[key] = this.currentSummaryData[key] || 0

@@ -110,7 +110,8 @@ export default {
       this.columnOrder = this.fieldMetaList.map(f => f.fieldKey)
       this.filterSchemes = []
       this.columnWidths = {}
-
+      this.$set(this.columnWidths, '__showSummary', this.showSummary)
+      this.$set(this.columnWidths, '__showUniversalFilter', this.showUniversalFilter)
     },
 
     clearStorageConfig() {
@@ -154,7 +155,7 @@ export default {
       }
     },
 
-    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, defaultPageSize }) {
+    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, defaultPageSize, showSummary, showUniversalFilter }) {
       this.visibleFields = visibleFields
       this.columnOrder = columnOrder
       this.frozenFields = frozenFields
@@ -167,6 +168,12 @@ export default {
       }
       if (defaultPageSize !== undefined) {
         this.$set(this.columnWidths, '__defaultPageSize', defaultPageSize)
+      }
+      if (showSummary !== undefined) {
+        this.$set(this.columnWidths, '__showSummary', showSummary)
+      }
+      if (showUniversalFilter !== undefined) {
+        this.$set(this.columnWidths, '__showUniversalFilter', showUniversalFilter)
       }
       if (defaultPageSize && defaultPageSize >= 10 && defaultPageSize <= 2000) {
         this.pageSize = defaultPageSize

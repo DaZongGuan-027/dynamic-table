@@ -76,6 +76,10 @@
           <i class="el-icon-info"></i>
           勾选需要作为筛选项的字段，拖拽调整顺序
         </div>
+        <div class="config-switch-row">
+          <span class="config-switch-label">万能筛选</span>
+          <el-switch v-model="editShowUniversalFilter" active-text="开启" inactive-text="关闭" />
+        </div>
         <div class="select-all-row">
           <el-checkbox
             v-model="filterAllChecked"
@@ -166,6 +170,10 @@
           <i class="el-icon-info"></i>
           设置分页条数选项和默认展示条数，最大不超过2000
         </div>
+        <div class="config-switch-row">
+          <span class="config-switch-label">合计行</span>
+          <el-switch v-model="editShowSummary" active-text="开启" inactive-text="关闭" />
+        </div>
         <div class="pagination-config">
           <div class="pagination-config-label">默认展示条数</div>
           <div class="pagination-config-default-size">
@@ -248,7 +256,9 @@ export default {
     filterSchemes: { type: Array, default: () => [] },
     currentFilterValues: { type: Object, default: () => ({}) },
     pageSizes: { type: Array, default: () => [10, 20, 50, 100] },
-    defaultPageSize: { type: Number, default: 0 }
+    defaultPageSize: { type: Number, default: 0 },
+    showSummary: { type: Boolean, default: false },
+    showUniversalFilter: { type: Boolean, default: true }
   },
 
   computed: {
@@ -274,6 +284,8 @@ export default {
       editingSchemeName: '',
       editPageSizes: [],
       editDefaultPageSize: 0,
+      editShowSummary: false,
+      editShowUniversalFilter: true,
       customPageSizeInput: 50,
       presetPageSizes: [10, 20, 50, 100, 200, 500, 1000, 2000]
     }
@@ -407,6 +419,8 @@ export default {
 
       this.editPageSizes = [...(this.pageSizes || [10, 20, 50, 100])].sort((a, b) => a - b)
       this.editDefaultPageSize = this.defaultPageSize || 0
+      this.editShowSummary = this.showSummary
+      this.editShowUniversalFilter = this.showUniversalFilter
 
       this.activeTab = 'column'
     },
@@ -606,7 +620,9 @@ export default {
         filterFields,
         filterSchemes,
         pageSizes: [...this.editPageSizes].sort((a, b) => a - b),
-        defaultPageSize: this.editDefaultPageSize || 0
+        defaultPageSize: this.editDefaultPageSize || 0,
+        showSummary: this.editShowSummary,
+        showUniversalFilter: this.editShowUniversalFilter
       })
       this.drawerVisible = false
     },
@@ -821,6 +837,19 @@ export default {
   font-size: 13px;
   color: #606266;
   margin-bottom: 8px;
+  font-weight: 500;
+}
+.config-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+}
+.config-switch-label {
+  font-size: 13px;
+  color: #606266;
   font-weight: 500;
 }
 .pagination-config-options {
