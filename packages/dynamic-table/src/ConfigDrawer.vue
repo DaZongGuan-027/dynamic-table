@@ -384,7 +384,7 @@ export default {
       this.editFilterFields = [...this.filterFields]
 
       const filterableList = this.fieldMetaList.filter(
-        f => f.filterable && columnList.some(c => c.fieldKey === f.fieldKey && c.visible)
+        f => f.filterable
       )
       const filterFieldSet = new Set(this.filterFields)
       const orderedFilterKeys = this.filterFields.filter(k => filterableList.some(f => f.fieldKey === k))
