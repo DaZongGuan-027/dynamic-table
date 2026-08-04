@@ -6,6 +6,9 @@
     :fetch-data-fn="fetchDataFn"
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
+    :default-visible-fields="defaultVisibleFields"
+    :show-summary="true"
+    :fetch-summary-fn="fetchSummaryFn"
     row-key="id"
 
     @selection-change="handleSelectionChange"
@@ -31,6 +34,14 @@ export default {
     return {
 
       selectedRows: [],
+
+      defaultVisibleFields: [
+        '__selection', '__index',
+        'accountDate', 'period', 'subjectCode', 'subjectName',
+        'summary', 'debitAmount', 'creditAmount', 'balanceDirection',
+        'balance', 'accountingEntity', 'currency', 'auxiliaryItem',
+        'maker', 'reviewer', 'bookkeeper', '__actions'
+      ],
 
       fieldMetaList: [
         { fieldKey: '__selection', fieldLabel: '选择框', fieldType: 'selection', width: 50 },
@@ -224,6 +235,23 @@ export default {
 
     saveConfigFn(config) {
       return saveTableConfig(config)
+    },
+
+    fetchSummaryFn(params) {
+      return getAccountingData({ ...params, pageSize: 999999 }).then(result => {
+        const list = result.list || []
+        const sums = {}
+        const keys = ['debitAmount', 'creditAmount', 'balance']
+        keys.forEach(key => {
+          let total = 0
+          list.forEach(row => {
+            const v = Number(row[key])
+            if (!isNaN(v)) total += v
+          })
+          sums[key] = total
+        })
+        return sums
+      })
     },
 
     handleSelectionChange(selection) {

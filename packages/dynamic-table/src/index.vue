@@ -38,10 +38,11 @@
       <el-table
         ref="elTable"
         :key="tableKey"
-        :data="tableData"
+        :data="displayData"
         :border="border"
         :stripe="stripe"
-        :row-key="rowKey"
+        :row-key="getRowKey"
+        :row-class-name="getRowClassName"
         :height="computedTableHeight"
         v-loading="tableLoading"
 
@@ -57,6 +58,7 @@
           :fixed="getFrozenFixed('__selection')"
           :header-align="headerAlign"
           align="center"
+          :selectable="isRowSelectable"
         />
         <el-table-column
           v-else-if="fieldKey === '__index' && hasIndex && isSpecialVisible('__index')"
@@ -67,7 +69,12 @@
           :fixed="getFrozenFixed('__index')"
           :header-align="headerAlign"
           align="center"
-        />
+        >
+          <template slot-scope="scope">
+            <span v-if="scope.row.__isSummaryRow" class="summary-toggle" @click="toggleSummaryMode">{{ summaryLabel }}</span>
+            <span v-else>{{ scope.$index }}</span>
+          </template>
+        </el-table-column>
         <el-table-column
           v-else-if="fieldKey === '__actions' && hasRowActions && isSpecialVisible('__actions')"
           :key="fieldKey"
@@ -78,20 +85,22 @@
           align="center"
         >
           <template slot-scope="scope">
-            <slot name="actions" :row="scope.row">
-              <template v-for="(action, idx) in getRowActions">
-                <el-button
-                  v-if="isActionVisible(action, scope.row)"
-                  :key="idx"
-                  :type="resolveActionProp(action.type, scope.row) || 'text'"
-                  :icon="action.icon"
-                  :disabled="resolveActionProp(action.disabled, scope.row)"
-                  size="mini"
-                  :style="action.style || {}"
-                  @click="handleRowAction(action, scope.row)"
-                >{{ action.label }}</el-button>
-              </template>
-            </slot>
+            <template v-if="!scope.row.__isSummaryRow">
+              <slot name="actions" :row="scope.row">
+                <template v-for="(action, idx) in getRowActions">
+                  <el-button
+                    v-if="isActionVisible(action, scope.row)"
+                    :key="idx"
+                    :type="resolveActionProp(action.type, scope.row) || 'text'"
+                    :icon="action.icon"
+                    :disabled="resolveActionProp(action.disabled, scope.row)"
+                    size="mini"
+                    :style="action.style || {}"
+                    @click="handleRowAction(action, scope.row)"
+                  >{{ action.label }}</el-button>
+                </template>
+              </slot>
+            </template>
           </template>
         </el-table-column>
         <el-table-column
@@ -119,7 +128,12 @@
             />
           </template>
           <template slot-scope="scope">
+            <template v-if="scope.row.__isSummaryRow">
+              <span v-if="!hasIndex && isFirstVisibleDataField(fieldKey)" class="summary-toggle" @click="toggleSummaryMode">{{ summaryLabel }}</span>
+              <span v-else-if="summableFieldKeys.includes(fieldKey)">{{ _formatCurrency(scope.row[fieldKey]) }}</span>
+            </template>
             <slot
+              v-else
               :name="'column-' + fieldKey"
               :row="scope.row"
               :value="scope.row[fieldKey]"
@@ -208,7 +222,10 @@ export default {
     pageSizeParamName: { type: String, default: 'pageSize' },
     defaultFilterValues: { type: Object, default: () => ({}) },
     filterCacheKey: { type: String, default: '' },
-    cacheFilters: { type: Boolean, default: false }
+    cacheFilters: { type: Boolean, default: false },
+
+    showSummary: { type: Boolean, default: false },
+    fetchSummaryFn: { type: Function, default: null }
   },
 
   data() {
@@ -225,7 +242,10 @@ export default {
 
       columnSearchValues: {},
       activeSchemeIndex: -1,
-      _lastCustomFilterValues: {}
+      _lastCustomFilterValues: {},
+      summaryMode: 'page',
+      allSummaryData: null,
+      summaryLoading: false
     }
   },
 
@@ -326,6 +346,45 @@ export default {
 
     normalColumns() {
       return this.orderedVisibleFields.filter(key => !this.frozenFields.includes(key))
+    },
+
+    summableFields() {
+      return this.fieldMetaList.filter(f => f.fieldType === 'currency' || f.fieldType === 'number')
+    },
+
+    summableFieldKeys() {
+      return this.summableFields.map(f => f.fieldKey)
+    },
+
+    pageSummaryData() {
+      const sums = {}
+      this.summableFieldKeys.forEach(key => {
+        let total = 0
+        this.tableData.forEach(row => {
+          const v = Number(row[key])
+          if (!isNaN(v)) total += v
+        })
+        sums[key] = total
+      })
+      return sums
+    },
+
+    currentSummaryData() {
+      if (this.summaryMode === 'all' && this.allSummaryData) return this.allSummaryData
+      return this.pageSummaryData
+    },
+
+    summaryLabel() {
+      return this.summaryMode === 'all' ? '合计：所有页' : '合计：当前页'
+    },
+
+    displayData() {
+      if (!this.showSummary || this.tableData.length === 0) return this.tableData
+      const summaryRow = { __isSummaryRow: true }
+      this.summableFieldKeys.forEach(key => {
+        summaryRow[key] = this.currentSummaryData[key] || 0
+      })
+      return [summaryRow, ...this.tableData]
     }
   },
 
@@ -351,6 +410,63 @@ export default {
   },
 
   methods: {
+    getRowKey(row) {
+      if (row.__isSummaryRow) return '__summary_row__'
+      return row[this.rowKey]
+    },
+
+    getRowClassName({ row }) {
+      if (row.__isSummaryRow) return 'summary-row'
+      return ''
+    },
+
+    isRowSelectable(row) {
+      return !row.__isSummaryRow
+    },
+
+    isFirstVisibleDataField(fieldKey) {
+      const firstKey = this.orderedVisibleFields.find(k => this.isDataField(k))
+      return fieldKey === firstKey
+    },
+
+    async toggleSummaryMode() {
+      if (this.summaryMode === 'page') {
+        if (this.fetchSummaryFn) {
+          this.summaryLoading = true
+          try {
+            const mergedFilters = { ...this.activeFilters }
+            Object.keys(this.columnSearchValues).forEach(key => {
+              const val = this.columnSearchValues[key]
+              if (val !== null && val !== undefined && val !== '') {
+                mergedFilters[key] = val
+              }
+            })
+            if (this._lastCustomFilterValues) {
+              Object.keys(this._lastCustomFilterValues).forEach(key => {
+                mergedFilters[key] = this._lastCustomFilterValues[key]
+              })
+            }
+            const params = {
+              filters: mergedFilters,
+              sortBy: this.currentSortBy,
+              sortOrder: this.currentSortOrder
+            }
+            const result = await this.fetchSummaryFn(params)
+            this.allSummaryData = result || {}
+            this.summaryMode = 'all'
+          } catch (e) {
+            console.error('获取合计数据失败:', e)
+          } finally {
+            this.summaryLoading = false
+          }
+        } else {
+          this.summaryMode = 'all'
+        }
+      } else {
+        this.summaryMode = 'page'
+      }
+    },
+
     async fetchData() {
       this.tableLoading = true
       try {
@@ -376,6 +492,8 @@ export default {
         const result = await this.fetchDataFn(params)
         this.tableData = result.list || []
         this.total = result.total || 0
+        this.summaryMode = 'page'
+        this.allSummaryData = null
         this.$nextTick(() => {
           this.$nextTick(() => {
             if (this.$refs.elTable) this.$refs.elTable.doLayout()
@@ -469,7 +587,8 @@ export default {
     },
 
     handleSelectionChange(selection) {
-      this.$emit('selection-change', selection)
+      const filtered = selection.filter(row => !row.__isSummaryRow)
+      this.$emit('selection-change', filtered)
     },
 
     handleResetDefault() {
@@ -708,5 +827,21 @@ export default {
   justify-content: flex-end;
   padding-top: 12px;
   flex-shrink: 0;
+}
+.dynamic-table >>> .el-table .summary-row {
+  background: #fafafa;
+  font-weight: bold;
+}
+.dynamic-table >>> .el-table .summary-row td {
+  background: #fafafa !important;
+}
+.summary-toggle {
+  cursor: pointer;
+  color: #409eff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.summary-toggle:hover {
+  color: #66b1ff;
 }
 </style>
