@@ -58,7 +58,12 @@ export default {
               values[meta.fieldKey] = { operator: 'eq', value: '' }
               break
             case 'date':
-              values[meta.fieldKey] = { range: null }
+              const dft = meta.dateFilterType || 'daterange'
+              if (dft === 'daterange' || dft === 'monthrange') {
+                values[meta.fieldKey] = { range: null }
+              } else {
+                values[meta.fieldKey] = { value: null }
+              }
               break
             case 'boolean':
               values[meta.fieldKey] = ''

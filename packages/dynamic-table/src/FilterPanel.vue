@@ -102,6 +102,7 @@
 
                 <template v-else-if="meta.fieldType === 'date'">
                   <el-date-picker
+                    v-if="getDateFilterType(meta) === 'daterange'"
                     v-model="filterValues[meta.fieldKey].range"
                     type="daterange"
                     range-separator="至"
@@ -110,6 +111,39 @@
                     value-format="yyyy-MM-dd"
                     clearable
                     :picker-options="datePickerOptions"
+                    :append-to-body="popperAppendToBody"
+                    style="width: 100%"
+                  />
+                  <el-date-picker
+                    v-else-if="getDateFilterType(meta) === 'monthrange'"
+                    v-model="filterValues[meta.fieldKey].range"
+                    type="monthrange"
+                    range-separator="至"
+                    start-placeholder="开始月份"
+                    end-placeholder="结束月份"
+                    value-format="yyyy-MM"
+                    clearable
+                    :picker-options="monthPickerOptions"
+                    :append-to-body="popperAppendToBody"
+                    style="width: 100%"
+                  />
+                  <el-date-picker
+                    v-else-if="getDateFilterType(meta) === 'month'"
+                    v-model="filterValues[meta.fieldKey].value"
+                    type="month"
+                    :placeholder="'选择' + meta.fieldLabel"
+                    value-format="yyyy-MM"
+                    clearable
+                    :append-to-body="popperAppendToBody"
+                    style="width: 100%"
+                  />
+                  <el-date-picker
+                    v-else-if="getDateFilterType(meta) === 'date'"
+                    v-model="filterValues[meta.fieldKey].value"
+                    type="date"
+                    :placeholder="'选择' + meta.fieldLabel"
+                    value-format="yyyy-MM-dd"
+                    clearable
                     :append-to-body="popperAppendToBody"
                     style="width: 100%"
                   />
@@ -183,6 +217,7 @@
               </template>
               <template v-else-if="customFilter.fieldType === 'date'">
                 <el-date-picker
+                  v-if="customFilter.dateFilterType === 'daterange'"
                   v-model="customFilter.value.range"
                   type="daterange"
                   size="small"
@@ -192,6 +227,42 @@
                   value-format="yyyy-MM-dd"
                   clearable
                   :picker-options="datePickerOptions"
+                  :append-to-body="popperAppendToBody"
+                  style="flex: 1; min-width: 0"
+                />
+                <el-date-picker
+                  v-else-if="customFilter.dateFilterType === 'monthrange'"
+                  v-model="customFilter.value.range"
+                  type="monthrange"
+                  size="small"
+                  range-separator="至"
+                  start-placeholder="开始"
+                  end-placeholder="结束"
+                  value-format="yyyy-MM"
+                  clearable
+                  :picker-options="monthPickerOptions"
+                  :append-to-body="popperAppendToBody"
+                  style="flex: 1; min-width: 0"
+                />
+                <el-date-picker
+                  v-else-if="customFilter.dateFilterType === 'month'"
+                  v-model="customFilter.value.value"
+                  type="month"
+                  size="small"
+                  placeholder="选择月份"
+                  value-format="yyyy-MM"
+                  clearable
+                  :append-to-body="popperAppendToBody"
+                  style="flex: 1; min-width: 0"
+                />
+                <el-date-picker
+                  v-else-if="customFilter.dateFilterType === 'date'"
+                  v-model="customFilter.value.value"
+                  type="date"
+                  size="small"
+                  placeholder="选择日期"
+                  value-format="yyyy-MM-dd"
+                  clearable
                   :append-to-body="popperAppendToBody"
                   style="flex: 1; min-width: 0"
                 />
@@ -317,6 +388,7 @@ export default {
       customFilter: {
         fieldKey: '',
         fieldType: '',
+        dateFilterType: 'daterange',
         hasEnum: false,
         enumOptions: [],
         value: null
@@ -349,6 +421,56 @@ export default {
               const end = new Date()
               const start = new Date()
               start.setMonth(start.getMonth() - 3)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '本年',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(0)
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '重置',
+            onClick(picker) {
+              picker.$emit('pick', [])
+            }
+          }
+        ]
+      },
+      monthPickerOptions: {
+        shortcuts: [
+          {
+            text: '本月',
+            onClick(picker) {
+              const start = new Date()
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '上月',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(start.getMonth() - 1)
+              start.setDate(1)
+              const end = new Date()
+              end.setDate(0)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '本季度',
+            onClick(picker) {
+              const now = new Date()
+              const quarter = Math.floor(now.getMonth() / 3)
+              const start = new Date(now.getFullYear(), quarter * 3, 1)
+              const end = new Date(now.getFullYear(), quarter * 3 + 3, 0)
               picker.$emit('pick', [start, end])
             }
           },
@@ -420,6 +542,10 @@ export default {
     hasEnumOptions(meta) {
       return meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
     },
+    getDateFilterType(meta) {
+      if (meta && meta.dateFilterType) return meta.dateFilterType
+      return 'daterange'
+    },
     normalizeEnumValues(enumValues) {
       if (!enumValues) return []
       if (Array.isArray(enumValues)) return enumValues
@@ -465,13 +591,19 @@ export default {
         return
       }
       cf.fieldType = meta.fieldType || 'string'
+      cf.dateFilterType = this.getDateFilterType(meta)
       const enumOpts = this.normalizeEnumValues(meta.enumValues)
       cf.hasEnum = enumOpts.length > 0
       cf.enumOptions = enumOpts
       if (cf.hasEnum) {
         cf.value = []
       } else if (cf.fieldType === 'date') {
-        cf.value = { range: null }
+        const dft = cf.dateFilterType
+        if (dft === 'daterange' || dft === 'monthrange') {
+          cf.value = { range: null }
+        } else {
+          cf.value = { value: null }
+        }
       } else if (cf.fieldType === 'boolean') {
         cf.value = ''
       } else if (cf.fieldType === 'number' || cf.fieldType === 'currency') {

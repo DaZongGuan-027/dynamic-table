@@ -696,7 +696,12 @@ export default {
               newValues[meta.fieldKey] = { min: '', max: '' }
               break
             case 'date':
-              newValues[meta.fieldKey] = { start: '', end: '' }
+              const dft = meta.dateFilterType || 'daterange'
+              if (dft === 'daterange' || dft === 'monthrange') {
+                newValues[meta.fieldKey] = { range: null }
+              } else {
+                newValues[meta.fieldKey] = { value: null }
+              }
               break
             case 'boolean':
               newValues[meta.fieldKey] = ''

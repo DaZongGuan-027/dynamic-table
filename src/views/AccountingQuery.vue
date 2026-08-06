@@ -67,7 +67,8 @@ export default {
         {
           fieldKey: 'period',
           fieldLabel: '会计期间',
-          fieldType: 'string',
+          fieldType: 'date',
+          dateFilterType: 'month',
           filterable: true,
           sortable: true,
           width: 100,

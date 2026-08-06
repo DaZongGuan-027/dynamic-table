@@ -113,6 +113,7 @@
         </div>
          <div v-else-if="fieldMeta.fieldType === 'date'" class="date-search">
           <el-date-picker
+            v-if="dateFilterType === 'daterange'"
             v-model="searchValue.range"
             type="daterange"
             size="mini"
@@ -122,6 +123,42 @@
             value-format="yyyy-MM-dd"
             clearable
             :picker-options="datePickerOptions"
+            :append-to-body="popperAppendToBody"
+            style="width: 100%"
+          />
+          <el-date-picker
+            v-else-if="dateFilterType === 'monthrange'"
+            v-model="searchValue.range"
+            type="monthrange"
+            size="mini"
+            range-separator="至"
+            start-placeholder="开始月份"
+            end-placeholder="结束月份"
+            value-format="yyyy-MM"
+            clearable
+            :picker-options="monthPickerOptions"
+            :append-to-body="popperAppendToBody"
+            style="width: 100%"
+          />
+          <el-date-picker
+            v-else-if="dateFilterType === 'month'"
+            v-model="searchValue.value"
+            type="month"
+            size="mini"
+            placeholder="选择月份"
+            value-format="yyyy-MM"
+            clearable
+            :append-to-body="popperAppendToBody"
+            style="width: 100%"
+          />
+          <el-date-picker
+            v-else-if="dateFilterType === 'date'"
+            v-model="searchValue.value"
+            type="date"
+            size="mini"
+            placeholder="选择日期"
+            value-format="yyyy-MM-dd"
+            clearable
             :append-to-body="popperAppendToBody"
             style="width: 100%"
           />
@@ -220,6 +257,56 @@ export default {
             }
           }
         ]
+      },
+      monthPickerOptions: {
+        shortcuts: [
+          {
+            text: '本月',
+            onClick(picker) {
+              const start = new Date()
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '上月',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(start.getMonth() - 1)
+              start.setDate(1)
+              const end = new Date()
+              end.setDate(0)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '本季度',
+            onClick(picker) {
+              const now = new Date()
+              const quarter = Math.floor(now.getMonth() / 3)
+              const start = new Date(now.getFullYear(), quarter * 3, 1)
+              const end = new Date(now.getFullYear(), quarter * 3 + 3, 0)
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '本年',
+            onClick(picker) {
+              const start = new Date()
+              start.setMonth(0)
+              start.setDate(1)
+              const end = new Date()
+              picker.$emit('pick', [start, end])
+            }
+          },
+          {
+            text: '重置',
+            onClick(picker) {
+              picker.$emit('pick', [])
+            }
+          }
+        ]
       }
     }
   },
@@ -236,6 +323,11 @@ export default {
   },
 
   computed: {
+    dateFilterType() {
+      if (this.fieldMeta && this.fieldMeta.dateFilterType) return this.fieldMeta.dateFilterType
+      return 'daterange'
+    },
+
     currentSort() {
       return this.currentSortOrder || ''
     },
@@ -338,9 +430,16 @@ export default {
           ? { operator: saved.operator || 'eq', value: saved.value != null ? saved.value : '' }
           : { operator: 'eq', value: '' }
       } else if (meta.fieldType === 'date') {
-        this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
-          ? { range: saved.range || null }
-          : { range: null }
+        const dft = this.dateFilterType
+        if (dft === 'daterange' || dft === 'monthrange') {
+          this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
+            ? { range: saved.range || null }
+            : { range: null }
+        } else {
+          this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
+            ? { value: saved.value || null }
+            : { value: null }
+        }
       } else {
         this.searchValue = saved || ''
       }
