@@ -73,7 +73,7 @@
         >
           <template slot-scope="scope">
             <span v-if="scope.row.__isSummaryRow"></span>
-            <span v-else>{{ scope.$index }}</span>
+            <span v-else>{{ scope.$index + (computedShowSummary ? 0 : 1) }}</span>
           </template>
         </el-table-column>
         <el-table-column
