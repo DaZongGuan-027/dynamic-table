@@ -400,12 +400,15 @@ export default {
       const q = (query || '').toLowerCase()
       if (q) {
         this.enumHeaderFilterQuery = q
+        this.enumSearchOptions = all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
+      } else {
+        const prevQ = this.enumHeaderFilterQuery || ''
+        if (prevQ) {
+          this.enumSearchOptions = all.filter(o => (o.label + '').toLowerCase().includes(prevQ) || (o.value + '').toLowerCase().includes(prevQ))
+        } else {
+          this.enumSearchOptions = null
+        }
       }
-      if (!q) {
-        this.enumSearchOptions = null
-        return
-      }
-      this.enumSearchOptions = all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
     },
     resetEnumHeaderFilter() {
       this.enumHeaderFilterQuery = ''

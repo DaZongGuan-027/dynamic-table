@@ -569,12 +569,15 @@ export default {
       const q = (query || '').toLowerCase()
       if (q) {
         this.$set(this.enumFilterQuery, fieldKey, q)
+        this.$set(this.enumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)))
+      } else {
+        const prevQ = this.enumFilterQuery[fieldKey] || ''
+        if (prevQ) {
+          this.$set(this.enumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(prevQ) || (o.value + '').toLowerCase().includes(prevQ)))
+        } else {
+          this.$set(this.enumOptionsMap, fieldKey, all)
+        }
       }
-      if (!q) {
-        this.$set(this.enumOptionsMap, fieldKey, all)
-        return
-      }
-      this.$set(this.enumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)))
     },
     resetEnumFilter(fieldKey, enumValues) {
       this.$set(this.enumFilterQuery, fieldKey, '')
@@ -595,6 +598,8 @@ export default {
       const enumOpts = this.normalizeEnumValues(meta.enumValues)
       cf.hasEnum = enumOpts.length > 0
       cf.enumOptions = enumOpts
+      this.$set(this.enumFilterQuery, '__custom__', '')
+      this.$set(this.enumOptionsMap, '__custom__', enumOpts)
       if (cf.hasEnum) {
         cf.value = []
       } else if (cf.fieldType === 'date') {
