@@ -32,6 +32,7 @@
                     filterable
                     remote
                     :remote-method="(q) => handleEnumRemoteFilter(meta.fieldKey, meta.enumValues, q)"
+                    @change="restoreEnumFilterText(meta.fieldKey, $event)"
                     :popper-append-to-body="popperAppendToBody"
                     @visible-change="(v) => !v && resetEnumFilter(meta.fieldKey, meta.enumValues)"
                   >
@@ -197,6 +198,7 @@
                   filterable
                   remote
                   :remote-method="(q) => handleEnumRemoteFilter('__custom__', customFilter.enumOptions, q)"
+                  @change="restoreEnumFilterText('__custom__', $event)"
                   @visible-change="(v) => !v && resetEnumFilter('__custom__', customFilter.enumOptions)"
                   size="small"
                   :popper-append-to-body="popperAppendToBody"
@@ -582,6 +584,21 @@ export default {
     resetEnumFilter(fieldKey, enumValues) {
       this.$set(this.enumFilterQuery, fieldKey, '')
       this.$set(this.enumOptionsMap, fieldKey, this.normalizeEnumValues(enumValues))
+    },
+    restoreEnumFilterText(fieldKey) {
+      const q = this.enumFilterQuery[fieldKey] || ''
+      if (q) {
+        this.$nextTick(() => {
+          const selects = this.$el.querySelectorAll('.el-select')
+          for (const sel of selects) {
+            const input = sel.querySelector('.el-select__input')
+            if (input && sel.__vue__ && sel.__vue__.remoteMethod) {
+              input.value = q
+              break
+            }
+          }
+        })
+      }
     },
     handleCustomFieldChange() {
       const cf = this.customFilter
