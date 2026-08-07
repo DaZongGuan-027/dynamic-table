@@ -485,6 +485,9 @@ export default {
       if (meta.fieldType === 'currency') {
         return this._formatCurrency(value)
       }
+      if (meta.fieldType === 'date') {
+        return this._formatDate(value, meta.dateFormat)
+      }
       if (meta.formatter && typeof meta.formatter === 'function') {
         return meta.formatter(value)
       }
@@ -505,6 +508,21 @@ export default {
       const num = Number(value)
       if (isNaN(num)) return value
       return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    },
+
+    _formatDate(value, dateFormat) {
+      if (!value) return ''
+      const d = new Date(value)
+      if (isNaN(d.getTime())) return value
+      const fmt = dateFormat || 'yyyy-MM-dd'
+      const pad = n => String(n).padStart(2, '0')
+      return fmt
+        .replace('yyyy', d.getFullYear())
+        .replace('MM', pad(d.getMonth() + 1))
+        .replace('dd', pad(d.getDate()))
+        .replace('HH', pad(d.getHours()))
+        .replace('mm', pad(d.getMinutes()))
+        .replace('ss', pad(d.getSeconds()))
     },
 
     _normalizeEnumValues(enumValues) {
