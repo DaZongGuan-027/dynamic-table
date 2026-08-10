@@ -1,8 +1,7 @@
 export default {
   props: {
     defaultFilterValues: { type: Object, default: () => ({}) },
-    filterCacheKey: { type: String, default: '' },
-    cacheFilters: { type: Boolean, default: false }
+    filterCacheKey: { type: String, default: '' }
   },
 
   data() {
@@ -13,6 +12,10 @@ export default {
   },
 
   computed: {
+    _filterCacheId() {
+      return this.filterCacheKey || this.menuId || ''
+    },
+
     activeFilters() {
       const filters = {}
       Object.keys(this.filterValues).forEach(key => {
@@ -82,7 +85,7 @@ export default {
         })
       }
 
-      if (applyDefaults && this.cacheFilters && this.filterCacheKey) {
+      if (applyDefaults && this._filterCacheId) {
         const cached = this._loadCachedFilters()
         if (cached) {
           Object.keys(cached).forEach(key => {
@@ -97,24 +100,25 @@ export default {
     },
 
     _loadCachedFilters() {
+      if (!this._filterCacheId) return null
       try {
-        const raw = localStorage.getItem('dynamic_table_filter_' + this.filterCacheKey)
+        const raw = localStorage.getItem('dynamic_table_filter_' + this._filterCacheId)
         if (raw) return JSON.parse(raw)
       } catch (e) {}
       return null
     },
 
     _saveCachedFilters() {
-      if (!this.cacheFilters || !this.filterCacheKey) return
+      if (!this._filterCacheId) return
       try {
-        localStorage.setItem('dynamic_table_filter_' + this.filterCacheKey, JSON.stringify(this.filterValues))
+        localStorage.setItem('dynamic_table_filter_' + this._filterCacheId, JSON.stringify(this.filterValues))
       } catch (e) {}
     },
 
     _clearCachedFilters() {
-      if (!this.filterCacheKey) return
+      if (!this._filterCacheId) return
       try {
-        localStorage.removeItem('dynamic_table_filter_' + this.filterCacheKey)
+        localStorage.removeItem('dynamic_table_filter_' + this._filterCacheId)
       } catch (e) {}
     },
 
@@ -149,7 +153,7 @@ export default {
   watch: {
     activeFilterMetaList: {
       handler() {
-        const hasCache = this.cacheFilters && this.filterCacheKey && this._loadCachedFilters()
+
         this.initFilterValues(true)
       },
       immediate: true

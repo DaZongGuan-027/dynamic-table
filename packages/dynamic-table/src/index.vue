@@ -224,7 +224,7 @@ export default {
     pageSizeParamName: { type: String, default: 'pageSize' },
     defaultFilterValues: { type: Object, default: () => ({}) },
     filterCacheKey: { type: String, default: '' },
-    cacheFilters: { type: Boolean, default: false },
+
 
     showSummary: { type: Boolean, default: false },
 
