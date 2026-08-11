@@ -64,7 +64,6 @@
                       placeholder="条件"
                       :popper-append-to-body="popperAppendToBody"
                       style="width: 100px; flex-shrink: 0"
-                      @change="$emit('apply')"
                     >
                       <el-option label="等于" value="eq" />
                       <el-option label="不等于" value="neq" />
@@ -90,7 +89,6 @@
                       placeholder="条件"
                       :popper-append-to-body="popperAppendToBody"
                       style="width: 100px; flex-shrink: 0"
-                      @change="$emit('apply')"
                     >
                       <el-option label="等于" value="eq" />
                       <el-option label="不等于" value="neq" />
