@@ -62,7 +62,7 @@
                       v-model="filterValues[meta.fieldKey].operator"
                       placeholder="条件"
                       :popper-append-to-body="popperAppendToBody"
-                      style="width: 90px; flex-shrink: 0"
+                      style="width: 100px; flex-shrink: 0"
                       @change="$emit('apply')"
                     >
                       <el-option label="等于" value="eq" />
@@ -88,7 +88,7 @@
                       v-model="filterValues[meta.fieldKey].operator"
                       placeholder="条件"
                       :popper-append-to-body="popperAppendToBody"
-                      style="width: 90px; flex-shrink: 0"
+                      style="width: 100px; flex-shrink: 0"
                       @change="$emit('apply')"
                     >
                       <el-option label="等于" value="eq" />
@@ -302,7 +302,7 @@
                     placeholder="条件"
                     size="small"
                     :popper-append-to-body="popperAppendToBody"
-                    style="width: 90px; flex-shrink: 0"
+                    style="width: 100px; flex-shrink: 0"
                   >
                     <template v-if="customFilter.fieldType === 'number' || customFilter.fieldType === 'currency'">
                       <el-option label="等于" value="eq" />

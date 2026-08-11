@@ -71,7 +71,7 @@
             size="mini"
             placeholder="条件"
             :popper-append-to-body="popperAppendToBody"
-            style="width: 90px; flex-shrink: 0"
+            style="width: 100px; flex-shrink: 0"
           >
             <el-option label="等于" value="eq" />
             <el-option label="不等于" value="neq" />
@@ -96,7 +96,7 @@
             size="mini"
             placeholder="条件"
             :popper-append-to-body="popperAppendToBody"
-            style="width: 90px; flex-shrink: 0"
+            style="width: 100px; flex-shrink: 0"
           >
             <el-option label="等于" value="eq" />
             <el-option label="不等于" value="neq" />
