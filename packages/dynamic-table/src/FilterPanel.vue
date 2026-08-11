@@ -26,7 +26,7 @@
                   <div class="compare-input">
                     <el-input
                       v-model="enumFilterText[meta.fieldKey]"
-                      placeholder="搜索"
+                      placeholder="过滤"
                       clearable
                       style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
                       @input="handleEnumFilterInput(meta.fieldKey, meta.enumValues)"
@@ -199,7 +199,7 @@
                 <div class="compare-input compare-input--small">
                   <el-input
                     v-model="enumFilterText['__custom__']"
-                    placeholder="搜索"
+                    placeholder="过滤"
                     clearable
                     size="small"
                     style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"

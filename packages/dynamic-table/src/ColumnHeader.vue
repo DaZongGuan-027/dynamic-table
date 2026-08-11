@@ -37,7 +37,7 @@
           <el-input
             v-model="enumFilterText"
             size="mini"
-            placeholder="搜索"
+            placeholder="过滤"
             clearable
             style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
           />
