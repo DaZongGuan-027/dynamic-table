@@ -28,7 +28,7 @@
                       v-model="enumFilterText[meta.fieldKey]"
                       placeholder="搜索"
                       clearable
-                      style="width: 40px; min-width: 40px; max-width: 40px; flex-shrink: 0"
+                      style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
                       @input="handleEnumFilterInput(meta.fieldKey, meta.enumValues)"
                       @keyup.enter.native="$emit('apply')"
                     />
@@ -201,7 +201,7 @@
                     placeholder="搜索"
                     clearable
                     size="small"
-                    style="width: 40px; min-width: 40px; max-width: 40px; flex-shrink: 0"
+                    style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
                     @input="handleEnumFilterInput('__custom__', customFilter.enumOptions)"
                   />
                   <el-select
