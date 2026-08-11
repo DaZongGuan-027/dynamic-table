@@ -798,7 +798,7 @@ export default {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
   gap: 8px 16px;
 }
 .filter-grid-item {
