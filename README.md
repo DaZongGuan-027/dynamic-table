@@ -133,11 +133,20 @@ export default {
 | rowKey | String | 否 | 'id' | 行数据唯一标识字段 |
 | border | Boolean | 否 | true | 是否显示边框 |
 | stripe | Boolean | 否 | true | 是否斑马纹 |
-| tableHeight | String/Number | 否 | undefined | 固定表格高度，不设置则自适应 |
+| tableHeight | String/Number | 否 | undefined | 固定表格高度，不设置则自适应（flex 布局） |
 | showPagination | Boolean | 否 | true | 是否显示分页 |
 | pageSizes | Array | 否 | [10,20,50,100] | 每页条数选项 |
+| pageSizeParamName | String | 否 | 'pageSize' | 分页大小参数名 |
+| pageParamName | String | 否 | 'page' | 页码参数名 |
 | headerAlign | String | 否 | 'center' | 表头对齐方式，默认居中 |
-| actionColumnWidth | String/Number | 否 | 150 | 操作列默认宽度（当 fieldMetaList 中 actions 列未指定 width 时生效） |
+| actionColumnWidth | String/Number | 否 | 150 | 操作列默认宽度 |
+| defaultFilterValues | Object | 否 | {} | 筛选条件默认值 |
+| filterCacheKey | String | 否 | '' | 筛选缓存 key，优先于 menuId |
+| cacheFilters | Boolean | 否 | true | 是否将筛选条件缓存到浏览器 |
+| filterPopperAppendToBody | Boolean | 否 | true | 筛选弹层是否挂载到 body |
+| defaultVisibleFields | Array | 否 | [] | 默认展示的列字段，不传则全部展示 |
+| showSummary | Boolean | 否 | false | 是否显示合计行 |
+| showUniversalFilter | Boolean | 否 | true | 是否显示万能筛选 |
 
 ### fieldMetaList 字段定义
 
@@ -150,10 +159,12 @@ export default {
 | fieldType | String | 是 | 字段类型：`string` / `number` / `enum` / `date` / `boolean` / `currency` |
 | filterable | Boolean | 否 | 是否可筛选 |
 | sortable | Boolean | 否 | 是否可排序 |
-| width | Number | 否 | 列宽 |
+| width | Number | 否 | 列最小宽度（使用 min-width，自动扩展填满容器） |
 | align | String | 否 | 对齐方式：`left` / `center` / `right` |
 | enumValues | Array/Object | 否 | 枚举值，支持数组 `[{ label, value }]` 或 Map `{ '001': '技术部' }` |
 | frozenPosition | String | 否 | 冻结位置：`'left'` / `'right'`，不设置则不冻结 |
+| dateFilterType | String | 否 | 日期筛选类型：`daterange`（默认）/ `monthrange` / `month` / `date` |
+| dateFormat | String | 否 | 日期展示格式：`yyyy-MM-dd`（默认）/ `yyyy-MM` / `yyyy-MM-dd HH:mm:ss` |
 
 #### 特殊列
 
@@ -190,13 +201,13 @@ export default {
 | 类型 | 说明 |
 |------|------|
 | selection | 选择框列，支持多选，触发 `selection-change` 事件 |
-| index | 序号列，自动显示行号 |
+| index | 序号列，自动显示行号（从1开始） |
 | actions | 操作列，通过 `actions` 属性配置按钮，触发 `row-action` 事件 |
 | string | 文本，筛选时为操作符下拉+输入框，默认"包含" |
 | number | 数值，筛选时为操作符下拉+输入框，默认"等于" |
 | currency | 金额，自动千分位格式化并保留两位小数，筛选同 number |
-| enum | 枚举，筛选时为多选下拉，列展示自动显示 label |
-| date | 日期，筛选时为日期范围选择器（含快捷按钮），自动拼接 00:00:00/23:59:59 |
+| enum | 枚举，筛选时为过滤输入框+多选下拉（含全选），列展示自动显示 label |
+| date | 日期，筛选类型由 `dateFilterType` 控制，展示格式由 `dateFormat` 控制 |
 | boolean | 布尔，筛选时为是/否下拉 |
 
 ### enumValues 格式
@@ -260,6 +271,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | eq | 等于 | string, number, currency |
 | neq | 不等于 | string, number, currency |
 | contains | 包含 | string |
+| in | 多个（按逗号/顿号/斜杠拆分） | string |
 | notContains | 不包含 | string |
 | startsWith | 开头是 | string |
 | endsWith | 结尾是 | string |
@@ -268,7 +280,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | gte | 大于等于 | number, currency |
 | lte | 小于等于 | number, currency |
 
-> 字符串类型默认操作符为 `contains`，数值/金额类型默认操作符为 `eq`
+> 字符串类型默认操作符为 `contains`，数值/金额类型默认操作符为 `eq`。`in` 操作符会将输入值按英文逗号 `,`、中文逗号 `，`、中文顿号 `、`、斜杠 `/` 拆分为数组传递到后端。
 
 ### fetchDataFn 返回格式
 
@@ -331,9 +343,24 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 - 勾选需要作为筛选项的字段，拖拽调整顺序
 - 筛选面板根据字段类型自动生成对应控件
 - 字符串/数值/金额类型：操作符下拉 + 值输入框
-- 日期类型：日期范围选择器，含快捷按钮（本月、上月、近三个月、本年、重置）
+- 枚举类型：过滤输入框 + 多选下拉（含全选，选项 > 1 时显示）
+- 日期类型：由 `dateFilterType` 控制筛选格式（`daterange`/`monthrange`/`month`/`date`）
+- 布尔类型：是/否下拉
 - 日期筛选值自动拼接时间：开始日期拼接 `00:00:00`，结束日期拼接 `23:59:59`
 - 筛选区域超过3行自动出现滚动条
+- 筛选条件默认缓存到浏览器 localStorage，可通过 `cacheFilters` 属性控制
+- 重置按钮同时清除筛选面板条件、表头搜索条件、排序和浏览器缓存
+
+### 万能筛选
+- 筛选面板底部提供万能筛选区域，可动态选择任意字段进行筛选
+- 选择字段后自动根据字段类型渲染对应筛选控件
+- 可通过 `showUniversalFilter` 属性或在配置抽屉中控制显隐
+
+### 合计行
+- 设置 `showSummary` 属性开启合计行
+- 合计行显示在表格首行，对 `currency`/`number` 类型列自动求和
+- 合计标签显示在第一个非金额/数字类型的可见数据列
+- 可在配置抽屉的分页配置 tab 中开关合计行
 
 ### 筛选方案
 - 最多保存5个常用筛选方案
@@ -352,11 +379,24 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 - 点击表头名称弹出下拉菜单，支持排序和搜索
 - 排序三态切换：升序 → 降序 → 无
 - 字符串/数值/金额类型搜索支持操作符选择
-- 日期类型搜索使用日期范围选择器，含快捷按钮
+- 枚举类型搜索：过滤输入框 + 多选下拉 + 搜索确认按钮
+- 日期类型搜索由 `dateFilterType` 控制选择器格式
 - 表头搜索条件与筛选面板条件合并后一起传给 fetchDataFn
+
+### 自适应高度
+- 不设置 `tableHeight` 时，表格使用 flex 布局自适应填满容器
+- 筛选区域展开/收起后自动重新分配空间
+- 支持 keep-alive 缓存页面，激活时自动重新布局
+
+### 列宽自适应
+- 数据列使用 `min-width`，列不会小于配置宽度
+- 当所有列宽之和小于容器宽度时，列自动按比例扩展填满
+- 当所有列宽之和超过容器宽度时，正常横向滚动
 
 ### 分页
 - 固定在表格底部，不随数据高度变化
+- 可在配置抽屉的分页配置 tab 中自定义条数选项和默认展示条数
+- 支持预设条数快选（10/20/50/100/200/500/1000/2000）
 
 ## 后端接口设计
 
@@ -487,7 +527,7 @@ CREATE TABLE t_table_config (
 
 | 字段类型 | filters 结构 | 后端处理方式 |
 |----------|-------------|-------------|
-| string | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%`, `startsWith` → `LIKE val%`, `endsWith` → `LIKE %val` |
+| string | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%`, `startsWith` → `LIKE val%`, `endsWith` → `LIKE %val`, `in` → `IN (val1, val2, ...)` |
 | number/currency | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `gt` → `>`, `lt` → `<`, `gte` → `>=`, `lte` → `<=` |
 | enum | `[value1, value2]` | `IN (value1, value2)` |
 | date | `{ start, end }` | `start` 已拼接 `00:00:00`，`end` 已拼接 `23:59:59`，直接用 `BETWEEN start AND end` |
@@ -514,6 +554,7 @@ public enum FilterOperator {
     NOT_CONTAINS("notContains", "NOT LIKE"),
     STARTS_WITH("startsWith", "LIKE"),
     ENDS_WITH("endsWith", "LIKE"),
+    IN("in", "IN"),
     GT("gt", ">"),
     LT("lt", "<"),
     GTE("gte", ">="),
@@ -589,6 +630,11 @@ private static void applyOperator(QueryWrapper<?> wrapper, String column, Filter
         case NOT_CONTAINS: wrapper.notLike(column, strVal); break;
         case STARTS_WITH: wrapper.likeRight(column, strVal); break;
         case ENDS_WITH: wrapper.likeLeft(column, strVal); break;
+        case IN:
+            if (filterValue instanceof List) {
+                wrapper.in(column, (List<?>) filterValue);
+            }
+            break;
         case GT:       wrapper.gt(column, strVal); break;
         case LT:       wrapper.lt(column, strVal); break;
         case GTE:      wrapper.ge(column, strVal); break;
