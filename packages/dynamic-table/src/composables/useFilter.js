@@ -32,7 +32,7 @@ export default {
           } else if (val.operator !== undefined) {
             if (val.value !== '' && val.value !== null && val.value !== undefined) {
               if (val.operator === 'in') {
-                const parts = String(val.value).split(/[,，/]/).map(s => s.trim()).filter(s => s)
+                const parts = String(val.value).split(/[,，、/]/).map(s => s.trim()).filter(s => s)
                 if (parts.length > 0) {
                   filters[key] = { operator: 'in', value: parts }
                 }
