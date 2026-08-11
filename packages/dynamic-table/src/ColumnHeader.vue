@@ -39,7 +39,7 @@
             size="mini"
             placeholder="搜索"
             clearable
-            style="width: 100px; flex-shrink: 0"
+            style="width: 50px; flex-shrink: 0"
           />
           <el-select
             v-model="searchValue"
