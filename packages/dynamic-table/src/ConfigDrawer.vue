@@ -564,7 +564,7 @@ export default {
         if (typeof val === 'object' && !Array.isArray(val)) {
           const subParts = []
           if (val.operator !== undefined && val.value !== '' && val.value !== null && val.value !== undefined) {
-            const opMap = { eq: '=', gt: '>', lt: '<', gte: '≥', lte: '≤', contains: '包含', notContains: '不包含' }
+            const opMap = { eq: '=', gt: '>', lt: '<', gte: '≥', lte: '≤', contains: '包含', notContains: '不包含', in: '多个' }
             subParts.push((opMap[val.operator] || val.operator) + val.value)
           }
           if (val.range && Array.isArray(val.range) && val.range.length === 2) {

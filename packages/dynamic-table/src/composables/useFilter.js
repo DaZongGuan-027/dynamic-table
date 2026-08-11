@@ -30,7 +30,16 @@ export default {
               }
             }
           } else if (val.operator !== undefined) {
-            if (val.value !== '' && val.value !== null && val.value !== undefined) filters[key] = val
+            if (val.value !== '' && val.value !== null && val.value !== undefined) {
+              if (val.operator === 'in') {
+                const parts = String(val.value).split(/[,，/]/).map(s => s.trim()).filter(s => s)
+                if (parts.length > 0) {
+                  filters[key] = { operator: 'in', value: parts }
+                }
+              } else {
+                filters[key] = val
+              }
+            }
           } else if (Object.keys(val).some(k => val[k] !== null && val[k] !== undefined && val[k] !== '')) {
             filters[key] = val
           }
