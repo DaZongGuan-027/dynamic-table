@@ -736,7 +736,9 @@ export default {
     },
 
     clearEnumFilterText() {
-      this.enumFilterText = {}
+      Object.keys(this.enumFilterText).forEach(key => {
+        this.$set(this.enumFilterText, key, '')
+      })
     }
   }
 }
