@@ -52,6 +52,7 @@
             style="flex: 1; min-width: 0"
           >
             <el-option
+              v-if="filteredEnumOptions.length > 1"
               label="全选"
               value="__all__"
               @click.native="handleEnumSelectAll($event)"

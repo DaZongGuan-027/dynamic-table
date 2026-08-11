@@ -42,6 +42,7 @@
                       style="flex: 1; min-width: 0"
                     >
                       <el-option
+                        v-if="getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
                         label="全选"
                         value="__all__"
                         @click.native="handleSelectAll(meta, $event)"
@@ -216,6 +217,7 @@
                     style="flex: 1; min-width: 0"
                   >
                     <el-option
+                      v-if="getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
                       label="全选"
                       value="__all__"
                       @click.native="handleCustomSelectAll($event)"
