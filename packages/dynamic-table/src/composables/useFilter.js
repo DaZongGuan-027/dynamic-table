@@ -194,10 +194,17 @@ export default {
   watch: {
     activeFilterMetaList: {
       handler() {
-
         this.initFilterValues(true)
       },
       immediate: true
+    },
+    filterValues: {
+      handler() {
+        if (this.cacheFilters && this._filterCacheId) {
+          this._saveCachedFilters()
+        }
+      },
+      deep: true
     }
   }
 }
