@@ -1,7 +1,8 @@
 export default {
   props: {
     defaultFilterValues: { type: Object, default: () => ({}) },
-    filterCacheKey: { type: String, default: '' }
+    filterCacheKey: { type: String, default: '' },
+    cacheFilters: { type: Boolean, default: true }
   },
 
   data() {
@@ -94,7 +95,7 @@ export default {
         })
       }
 
-      if (applyDefaults && this._filterCacheId) {
+      if (applyDefaults && this.cacheFilters && this._filterCacheId) {
         const cached = this._loadCachedFilters()
         if (cached) {
           Object.keys(cached).forEach(key => {
@@ -107,7 +108,7 @@ export default {
 
       this.filterValues = values
 
-      if (applyDefaults && this._filterCacheId && this.$refs.filterPanel) {
+      if (applyDefaults && this.cacheFilters && this._filterCacheId && this.$refs.filterPanel) {
         const cachedText = this._loadCachedEnumFilterText()
         if (cachedText) {
           this.$nextTick(() => {
@@ -129,7 +130,7 @@ export default {
     },
 
     _saveCachedFilters() {
-      if (!this._filterCacheId) return
+      if (!this.cacheFilters || !this._filterCacheId) return
       try {
         localStorage.setItem('dynamic_table_filter_' + this._filterCacheId, JSON.stringify(this.filterValues))
       } catch (e) {}
@@ -153,7 +154,7 @@ export default {
     },
 
     _saveCachedEnumFilterText(textMap) {
-      if (!this._filterCacheId) return
+      if (!this.cacheFilters || !this._filterCacheId) return
       try {
         localStorage.setItem('dynamic_table_enum_filter_text_' + this._filterCacheId, JSON.stringify(textMap))
       } catch (e) {}
