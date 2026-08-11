@@ -34,6 +34,13 @@
 
       <div v-if="showSearch" class="search-area" @click.stop>
         <div v-if="hasEnumOptions" class="enum-search">
+          <el-input
+            v-model="enumFilterText"
+            size="mini"
+            placeholder="搜索"
+            clearable
+            style="width: 100px; flex-shrink: 0"
+          />
           <el-select
             v-model="searchValue"
             size="mini"
@@ -41,13 +48,8 @@
             multiple
             clearable
             collapse-tags
-            filterable
-            remote
-            :remote-method="handleEnumRemoteFilter"
-            @change="restoreEnumFilterText"
-            @visible-change="(v) => !v && resetEnumHeaderFilter()"
             :popper-append-to-body="popperAppendToBody"
-            style="width: 100%"
+            style="flex: 1; min-width: 0"
           >
             <el-option
               label="全选"
@@ -55,7 +57,7 @@
               @click.native="handleEnumSelectAll($event)"
             />
             <el-option
-              v-for="opt in (enumSearchOptions || normalizedEnumValues)"
+              v-for="opt in filteredEnumOptions"
               :key="opt.value"
               :label="opt.label"
               :value="opt.value"
@@ -208,8 +210,7 @@ export default {
       popoverVisible: false,
       showSearch: false,
       searchValue: '',
-      enumSearchOptions: null,
-      enumHeaderFilterQuery: '',
+      enumFilterText: '',
       datePickerOptions: {
         shortcuts: [
           {
@@ -329,6 +330,13 @@ export default {
       return 'daterange'
     },
 
+    filteredEnumOptions() {
+      const all = this.normalizedEnumValues
+      const q = (this.enumFilterText || '').toLowerCase()
+      if (!q) return all
+      return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
+    },
+
     currentSort() {
       return this.currentSortOrder || ''
     },
@@ -388,9 +396,7 @@ export default {
     },
     handleEnumSelectAll(e) {
       e.stopPropagation()
-      const all = this.normalizedEnumValues
-      const q = this.enumHeaderFilterQuery || ''
-      const filtered = q ? all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)) : all
+      const filtered = this.filteredEnumOptions
       const filteredValues = filtered.map(o => o.value)
       const current = this.searchValue || []
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))

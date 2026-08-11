@@ -23,31 +23,37 @@
               <div class="filter-label">{{ meta.fieldLabel }}</div>
               <div class="filter-control">
                 <template v-if="hasEnumOptions(meta)">
-                  <el-select
-                    v-model="filterValues[meta.fieldKey]"
-                    :placeholder="'请选择' + meta.fieldLabel"
-                    multiple
-                    clearable
-                    collapse-tags
-                    filterable
-                    remote
-                    :remote-method="(q) => handleEnumRemoteFilter(meta.fieldKey, meta.enumValues, q)"
-                    @change="restoreEnumFilterText(meta.fieldKey, $event)"
-                    :popper-append-to-body="popperAppendToBody"
-                    @visible-change="(v) => !v && resetEnumFilter(meta.fieldKey, meta.enumValues)"
-                  >
-                    <el-option
-                      label="全选"
-                      value="__all__"
-                      @click.native="handleSelectAll(meta, $event)"
+                  <div class="compare-input">
+                    <el-input
+                      v-model="enumFilterText[meta.fieldKey]"
+                      placeholder="搜索"
+                      clearable
+                      style="width: 120px; flex-shrink: 0"
+                      @input="handleEnumFilterInput(meta.fieldKey, meta.enumValues)"
+                      @keyup.enter.native="$emit('apply')"
                     />
-                    <el-option
-                      v-for="opt in (enumOptionsMap[meta.fieldKey] || normalizeEnumValues(meta.enumValues))"
-                      :key="opt.value"
-                      :label="opt.label"
-                      :value="opt.value"
-                    />
-                  </el-select>
+                    <el-select
+                      v-model="filterValues[meta.fieldKey]"
+                      :placeholder="'请选择' + meta.fieldLabel"
+                      multiple
+                      clearable
+                      collapse-tags
+                      :popper-append-to-body="popperAppendToBody"
+                      style="flex: 1; min-width: 0"
+                    >
+                      <el-option
+                        label="全选"
+                        value="__all__"
+                        @click.native="handleSelectAll(meta, $event)"
+                      />
+                      <el-option
+                        v-for="opt in getFilteredEnumOptions(meta.fieldKey, meta.enumValues)"
+                        :key="opt.value"
+                        :label="opt.label"
+                        :value="opt.value"
+                      />
+                    </el-select>
+                  </div>
                 </template>
 
                 <template v-else-if="meta.fieldType === 'string'">
@@ -189,32 +195,38 @@
             </el-select>
             <div class="custom-filter-control" v-if="customFilter.fieldKey">
               <template v-if="customFilter.hasEnum">
-                <el-select
-                  v-model="customFilter.value"
-                  placeholder="请选择"
-                  multiple
-                  clearable
-                  collapse-tags
-                  filterable
-                  remote
-                  :remote-method="(q) => handleEnumRemoteFilter('__custom__', customFilter.enumOptions, q)"
-                  @change="restoreEnumFilterText('__custom__', $event)"
-                  @visible-change="(v) => !v && resetEnumFilter('__custom__', customFilter.enumOptions)"
-                  size="small"
-                  :popper-append-to-body="popperAppendToBody"
-                  style="flex: 1; min-width: 0"
-                >
-                  <el-option
-                    label="全选"
-                    value="__all__"
-                    @click.native="handleCustomSelectAll($event)"
+                <div class="compare-input compare-input--small">
+                  <el-input
+                    v-model="enumFilterText['__custom__']"
+                    placeholder="搜索"
+                    clearable
+                    size="small"
+                    style="width: 100px; flex-shrink: 0"
+                    @input="handleEnumFilterInput('__custom__', customFilter.enumOptions)"
                   />
-                  <el-option
-                    v-for="opt in (enumOptionsMap['__custom__'] || customFilter.enumOptions)"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
+                  <el-select
+                    v-model="customFilter.value"
+                    placeholder="请选择"
+                    multiple
+                    clearable
+                    collapse-tags
+                    size="small"
+                    :popper-append-to-body="popperAppendToBody"
+                    style="flex: 1; min-width: 0"
+                  >
+                    <el-option
+                      label="全选"
+                      value="__all__"
+                      @click.native="handleCustomSelectAll($event)"
+                    />
+                    <el-option
+                      v-for="opt in getFilteredEnumOptions('__custom__', customFilter.enumOptions)"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                </div>
                 </el-select>
               </template>
               <template v-else-if="customFilter.fieldType === 'date'">
@@ -385,8 +397,7 @@ export default {
 
   data() {
     return {
-      enumOptionsMap: {},
-      enumFilterQuery: {},
+      enumFilterText: {},
       customFilter: {
         fieldKey: '',
         fieldType: '',
@@ -556,49 +567,22 @@ export default {
       }
       return []
     },
+    getFilteredEnumOptions(fieldKey, enumValues) {
+      const all = this.normalizeEnumValues(enumValues)
+      const q = (this.enumFilterText[fieldKey] || '').toLowerCase()
+      if (!q) return all
+      return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
+    },
+    handleEnumFilterInput(fieldKey, enumValues) {
+      this._saveEnumFilterText()
+    },
     handleSelectAll(meta, e) {
       e.stopPropagation()
-      const all = this.normalizeEnumValues(meta.enumValues)
-      const q = this.enumFilterQuery[meta.fieldKey] || ''
-      const filtered = q ? all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)) : all
+      const filtered = this.getFilteredEnumOptions(meta.fieldKey, meta.enumValues)
       const filteredValues = filtered.map(o => o.value)
       const current = this.filterValues[meta.fieldKey] || []
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
       this.$set(this.filterValues, meta.fieldKey, isAllSelected ? [] : [...filteredValues])
-    },
-    handleEnumRemoteFilter(fieldKey, enumValues, query) {
-      const all = this.normalizeEnumValues(enumValues)
-      const q = (query || '').toLowerCase()
-      if (q) {
-        this.$set(this.enumFilterQuery, fieldKey, q)
-        this.$set(this.enumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)))
-      } else {
-        const prevQ = this.enumFilterQuery[fieldKey] || ''
-        if (prevQ) {
-          this.$set(this.enumOptionsMap, fieldKey, all.filter(o => (o.label + '').toLowerCase().includes(prevQ) || (o.value + '').toLowerCase().includes(prevQ)))
-        } else {
-          this.$set(this.enumOptionsMap, fieldKey, all)
-        }
-      }
-    },
-    resetEnumFilter(fieldKey, enumValues) {
-      this.$set(this.enumFilterQuery, fieldKey, '')
-      this.$set(this.enumOptionsMap, fieldKey, this.normalizeEnumValues(enumValues))
-    },
-    restoreEnumFilterText(fieldKey) {
-      const q = this.enumFilterQuery[fieldKey] || ''
-      if (q) {
-        this.$nextTick(() => {
-          const selects = this.$el.querySelectorAll('.el-select')
-          for (const sel of selects) {
-            const input = sel.querySelector('.el-select__input')
-            if (input && sel.__vue__ && sel.__vue__.remoteMethod) {
-              input.value = q
-              break
-            }
-          }
-        })
-      }
     },
     handleCustomFieldChange() {
       const cf = this.customFilter
@@ -615,8 +599,7 @@ export default {
       const enumOpts = this.normalizeEnumValues(meta.enumValues)
       cf.hasEnum = enumOpts.length > 0
       cf.enumOptions = enumOpts
-      this.$set(this.enumFilterQuery, '__custom__', '')
-      this.$set(this.enumOptionsMap, '__custom__', enumOpts)
+      this.$set(this.enumFilterText, '__custom__', '')
       if (cf.hasEnum) {
         cf.value = []
       } else if (cf.fieldType === 'date') {
@@ -636,9 +619,7 @@ export default {
     },
     handleCustomSelectAll(e) {
       e.stopPropagation()
-      const all = this.customFilter.enumOptions || []
-      const q = this.enumFilterQuery['__custom__'] || ''
-      const filtered = q ? all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q)) : all
+      const filtered = this.getFilteredEnumOptions('__custom__', this.customFilter.enumOptions)
       const filteredValues = filtered.map(o => o.value)
       const current = this.customFilter.value || []
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
@@ -742,6 +723,20 @@ export default {
         const filterValues = JSON.parse(JSON.stringify(this.filterValues))
         this.$emit('save-scheme', { name: value, filterValues })
       }).catch(() => {})
+    },
+
+    _saveEnumFilterText() {
+      this.$emit('save-enum-filter-text', JSON.parse(JSON.stringify(this.enumFilterText)))
+    },
+
+    initEnumFilterText(cachedText) {
+      if (cachedText && typeof cachedText === 'object') {
+        this.enumFilterText = cachedText
+      }
+    },
+
+    clearEnumFilterText() {
+      this.enumFilterText = {}
     }
   }
 }

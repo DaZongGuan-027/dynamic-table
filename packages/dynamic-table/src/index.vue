@@ -17,6 +17,7 @@
       @reset="resetFilters"
       @apply-scheme="handleApplyScheme"
       @save-scheme="handleSaveScheme"
+      @save-enum-filter-text="handleSaveEnumFilterText"
     />
 
     <div class="table-toolbar">
@@ -664,6 +665,10 @@ export default {
         this.activeSchemeIndex = this.filterSchemes.length - 1
       }
       this.saveConfig()
+    },
+
+    handleSaveEnumFilterText(textMap) {
+      this._saveCachedEnumFilterText(textMap)
     },
 
     getMergedFilterValues() {

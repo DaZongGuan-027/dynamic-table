@@ -97,6 +97,17 @@ export default {
       }
 
       this.filterValues = values
+
+      if (applyDefaults && this._filterCacheId && this.$refs.filterPanel) {
+        const cachedText = this._loadCachedEnumFilterText()
+        if (cachedText) {
+          this.$nextTick(() => {
+            if (this.$refs.filterPanel) {
+              this.$refs.filterPanel.initEnumFilterText(cachedText)
+            }
+          })
+        }
+      }
     },
 
     _loadCachedFilters() {
@@ -119,12 +130,32 @@ export default {
       if (!this._filterCacheId) return
       try {
         localStorage.removeItem('dynamic_table_filter_' + this._filterCacheId)
+        localStorage.removeItem('dynamic_table_enum_filter_text_' + this._filterCacheId)
+      } catch (e) {}
+    },
+
+    _loadCachedEnumFilterText() {
+      if (!this._filterCacheId) return null
+      try {
+        const raw = localStorage.getItem('dynamic_table_enum_filter_text_' + this._filterCacheId)
+        if (raw) return JSON.parse(raw)
+      } catch (e) {}
+      return null
+    },
+
+    _saveCachedEnumFilterText(textMap) {
+      if (!this._filterCacheId) return
+      try {
+        localStorage.setItem('dynamic_table_enum_filter_text_' + this._filterCacheId, JSON.stringify(textMap))
       } catch (e) {}
     },
 
     resetFilters() {
       this.initFilterValues(false)
       this._clearCachedFilters()
+      if (this.$refs.filterPanel) {
+        this.$refs.filterPanel.clearEnumFilterText()
+      }
       this.$emit('filter-change', {})
     },
 
