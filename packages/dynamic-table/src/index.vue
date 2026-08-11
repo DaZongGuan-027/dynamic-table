@@ -590,6 +590,7 @@ export default {
       this._lastCustomFilterValues = {}
       if (this.$refs.filterPanel) this.$refs.filterPanel.resetCustomFilters()
       this.scrollFilterToTop()
+      this.saveConfig()
       this.tableKey++
       this.$nextTick(() => {
         this.doLayout()
