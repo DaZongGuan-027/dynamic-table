@@ -35,7 +35,7 @@ export default {
               if (val.operator === 'in') {
                 const parts = String(val.value).split(/[,，、/]/).map(s => s.trim()).filter(s => s)
                 if (parts.length > 0) {
-                  filters[key] = { operator: 'in', value: parts }
+                  filters[key] = parts
                 }
               } else {
                 filters[key] = val

@@ -109,8 +109,7 @@ function _queryData(dataSource, params = {}) {
                   filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(fv)); break
                 case 'lte':
                   filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(fv)); break
-                case 'in':
-                  filtered = filtered.filter(row => Array.isArray(fv) && fv.some(v => String(row[fieldKey]) === String(v))); break
+
                 default:
                   filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().includes(String(fv).toLowerCase()))
               }
