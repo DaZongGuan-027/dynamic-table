@@ -43,6 +43,7 @@
           />
           <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
             <el-select
+              ref="enumSelectHeader"
               v-model="searchValue"
               size="mini"
               :placeholder="'选择' + fieldMeta.fieldLabel"
@@ -52,6 +53,7 @@
               class="enum-count-select"
               :popper-append-to-body="popperAppendToBody"
               style="width: 100%"
+              @change="restoreEnumFilter"
             >
             <el-option
               v-if="filteredEnumOptions.length > 1"
@@ -402,6 +404,20 @@ export default {
         return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
       }
       return []
+    },
+    restoreEnumFilter() {
+      const text = this.enumFilterText || ''
+      if (!text) return
+      this.$nextTick(() => {
+        const instance = this.$refs.enumSelectHeader
+        if (instance && instance.query !== undefined) {
+          instance.query = text
+        }
+        if (instance) {
+          const input = instance.$el && instance.$el.querySelector('.el-select__input')
+          if (input) input.value = text
+        }
+      })
     },
     handleEnumSelectAll(e) {
       e.stopPropagation()
