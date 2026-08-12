@@ -34,16 +34,13 @@
                     />
                     <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
                       <el-select
-                        :ref="'enumSelect_' + meta.fieldKey"
                         v-model="filterValues[meta.fieldKey]"
                         :placeholder="'请选择' + meta.fieldLabel"
                         multiple
                         clearable
-                        filterable
                         class="enum-count-select"
                         :popper-append-to-body="popperAppendToBody"
                         style="width: 100%"
-                        @change="restoreEnumFilter($event, meta.fieldKey)"
                       >
                         <el-option
                           v-if="getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
@@ -215,17 +212,14 @@
                   />
                   <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
                     <el-select
-                      ref="enumSelectCustom"
                       v-model="customFilter.value"
                       placeholder="请选择"
                       multiple
                       clearable
-                      filterable
                       class="enum-count-select"
                       size="small"
                       :popper-append-to-body="popperAppendToBody"
                       style="width: 100%"
-                      @change="restoreEnumFilter($event, '__custom__')"
                     >
                       <el-option
                         v-if="getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
@@ -593,22 +587,7 @@ export default {
       if (!q) return all
       return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
     },
-    restoreEnumFilter(val, fieldKey) {
-      const text = this.enumFilterText[fieldKey] || ''
-      if (!text) return
-      this.$nextTick(() => {
-        const refName = fieldKey === '__custom__' ? 'enumSelectCustom' : 'enumSelect_' + fieldKey
-        const sel = this.$refs[refName]
-        const instance = Array.isArray(sel) ? sel[0] : sel
-        if (instance && instance.query !== undefined) {
-          instance.query = text
-        }
-        if (instance) {
-          const input = instance.$el && instance.$el.querySelector('.el-select__input')
-          if (input) input.value = text
-        }
-      })
-    },
+
     handleEnumFilterInput(fieldKey, enumValues) {
       this._saveEnumFilterText()
     },
