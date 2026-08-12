@@ -586,8 +586,11 @@ export default {
   flex: 1;
   min-width: 0;
 }
-.enum-count-select .el-select__tags {
+.enum-count-select >>> .el-select__tags {
   display: none;
+}
+.enum-count-select >>> .el-input__inner {
+  padding-left: 8px;
 }
 .enum-selected-count {
   font-size: 12px;
