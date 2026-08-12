@@ -32,29 +32,35 @@
                       @input="handleEnumFilterInput(meta.fieldKey, meta.enumValues)"
                       @keyup.enter.native="$emit('apply')"
                     />
-                    <el-select
-                      v-model="filterValues[meta.fieldKey]"
-                      :placeholder="(filterValues[meta.fieldKey] && filterValues[meta.fieldKey].length) ? '已选' + filterValues[meta.fieldKey].length + '项' : '请选择' + meta.fieldLabel"
-                      multiple
-                      clearable
-                      filterable
-                      class="enum-count-select"
-                      :popper-append-to-body="popperAppendToBody"
-                      style="flex: 1; min-width: 0"
-                    >
-                      <el-option
-                        v-if="getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
-                        label="全选"
-                        value="__all__"
-                        @click.native="handleSelectAll(meta, $event)"
-                      />
-                      <el-option
-                        v-for="opt in getFilteredEnumOptions(meta.fieldKey, meta.enumValues)"
-                        :key="opt.value"
-                        :label="opt.label"
-                        :value="opt.value"
-                      />
-                    </el-select>
+                    <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
+                      <el-select
+                        v-model="filterValues[meta.fieldKey]"
+                        :placeholder="'请选择' + meta.fieldLabel"
+                        multiple
+                        clearable
+                        filterable
+                        class="enum-count-select"
+                        :popper-append-to-body="popperAppendToBody"
+                        style="width: 100%"
+                      >
+                        <el-option
+                          v-if="getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
+                          label="全选"
+                          value="__all__"
+                          @click.native="handleSelectAll(meta, $event)"
+                        />
+                        <el-option
+                          v-for="opt in getFilteredEnumOptions(meta.fieldKey, meta.enumValues)"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
+                        />
+                      </el-select>
+                      <span
+                        v-if="filterValues[meta.fieldKey] && filterValues[meta.fieldKey].length"
+                        class="enum-selected-count"
+                      >已选{{ filterValues[meta.fieldKey].length }}项</span>
+                    </div>
                   </div>
                 </template>
 
@@ -205,32 +211,38 @@
                     style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
                     @input="handleEnumFilterInput('__custom__', customFilter.enumOptions)"
                   />
-                  <el-select
-                    v-model="customFilter.value"
-                    :placeholder="(customFilter.value && customFilter.value.length) ? '已选' + customFilter.value.length + '项' : '请选择'"
-                    multiple
-                    clearable
-                    filterable
-                    class="enum-count-select"
-                    size="small"
-                    :popper-append-to-body="popperAppendToBody"
-                    style="flex: 1; min-width: 0"
-                  >
-                    <el-option
-                      v-if="getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
-                      label="全选"
-                      value="__all__"
-                      @click.native="handleCustomSelectAll($event)"
-                    />
-                    <el-option
-                      v-for="opt in getFilteredEnumOptions('__custom__', customFilter.enumOptions)"
-                      :key="opt.value"
-                      :label="opt.label"
-                      :value="opt.value"
-                    />
-                  </el-select>
+                  <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
+                    <el-select
+                      v-model="customFilter.value"
+                      placeholder="请选择"
+                      multiple
+                      clearable
+                      filterable
+                      class="enum-count-select"
+                      size="small"
+                      :popper-append-to-body="popperAppendToBody"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-if="getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
+                        label="全选"
+                        value="__all__"
+                        @click.native="handleCustomSelectAll($event)"
+                      />
+                      <el-option
+                        v-for="opt in getFilteredEnumOptions('__custom__', customFilter.enumOptions)"
+                        :key="opt.value"
+                        :label="opt.label"
+                        :value="opt.value"
+                      />
+                    </el-select>
+                    <span
+                      v-if="customFilter.value && customFilter.value.length"
+                      class="enum-selected-count"
+                    >已选{{ customFilter.value.length }}项</span>
+                  </div>
                 </div>
-                </el-select>
+
               </template>
               <template v-else-if="customFilter.fieldType === 'date'">
                 <el-date-picker
@@ -840,6 +852,17 @@ export default {
 }
 .enum-count-select >>> .el-select__tags .el-select__input {
   padding-left: 0;
+}
+.enum-select-wrapper .enum-selected-count {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .filter-actions {

@@ -41,17 +41,18 @@
             clearable
             style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
           />
-          <el-select
-            v-model="searchValue"
-            size="mini"
-            :placeholder="(searchValue && searchValue.length) ? '已选' + searchValue.length + '项' : '选择' + fieldMeta.fieldLabel"
-            multiple
-            clearable
-            filterable
-            class="enum-count-select"
-            :popper-append-to-body="popperAppendToBody"
-            style="flex: 1; min-width: 0"
-          >
+          <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
+            <el-select
+              v-model="searchValue"
+              size="mini"
+              :placeholder="'选择' + fieldMeta.fieldLabel"
+              multiple
+              clearable
+              filterable
+              class="enum-count-select"
+              :popper-append-to-body="popperAppendToBody"
+              style="width: 100%"
+            >
             <el-option
               v-if="filteredEnumOptions.length > 1"
               label="全选"
@@ -64,7 +65,12 @@
               :label="opt.label"
               :value="opt.value"
             />
-          </el-select>
+            </el-select>
+            <span
+              v-if="searchValue && searchValue.length"
+              class="enum-selected-count"
+            >已选{{ searchValue.length }}项</span>
+          </div>
           <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>
         </div>
         <div v-else-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType" class="compare-search">
@@ -589,6 +595,17 @@ export default {
 }
 .enum-count-select >>> .el-select__tags .el-select__input {
   padding-left: 0;
+}
+.enum-select-wrapper .enum-selected-count {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #606266;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .compare-search {
