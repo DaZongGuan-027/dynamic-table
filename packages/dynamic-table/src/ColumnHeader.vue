@@ -598,11 +598,11 @@ export default {
 }
 .enum-select-wrapper .enum-selected-count {
   position: absolute;
-  left: 8px;
+  right: 28px;
   top: 50%;
   transform: translateY(-50%);
   font-size: 12px;
-  color: #606266;
+  color: #409EFF;
   white-space: nowrap;
   pointer-events: none;
   z-index: 1;
