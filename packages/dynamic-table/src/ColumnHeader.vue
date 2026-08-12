@@ -47,10 +47,13 @@
             :placeholder="'选择' + fieldMeta.fieldLabel"
             multiple
             clearable
-            collapse-tags
+            class="enum-count-select"
             :popper-append-to-body="popperAppendToBody"
             style="flex: 1; min-width: 0"
           >
+            <template v-if="searchValue && searchValue.length" slot="prefix">
+              <span class="enum-selected-count">已选{{ searchValue.length }}项</span>
+            </template>
             <el-option
               v-if="filteredEnumOptions.length > 1"
               label="全选"
@@ -582,6 +585,14 @@ export default {
 .enum-search .el-select {
   flex: 1;
   min-width: 0;
+}
+.enum-count-select .el-select__tags {
+  display: none;
+}
+.enum-selected-count {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
 }
 .compare-search {
   display: flex;

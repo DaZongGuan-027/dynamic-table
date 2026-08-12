@@ -37,10 +37,13 @@
                       :placeholder="'请选择' + meta.fieldLabel"
                       multiple
                       clearable
-                      collapse-tags
+                      class="enum-count-select"
                       :popper-append-to-body="popperAppendToBody"
                       style="flex: 1; min-width: 0"
                     >
+                      <template v-if="filterValues[meta.fieldKey] && filterValues[meta.fieldKey].length" slot="prefix">
+                        <span class="enum-selected-count">已选{{ filterValues[meta.fieldKey].length }}项</span>
+                      </template>
                       <el-option
                         v-if="getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
                         label="全选"
@@ -209,11 +212,14 @@
                     placeholder="请选择"
                     multiple
                     clearable
-                    collapse-tags
+                    class="enum-count-select"
                     size="small"
                     :popper-append-to-body="popperAppendToBody"
                     style="flex: 1; min-width: 0"
                   >
+                    <template v-if="customFilter.value && customFilter.value.length" slot="prefix">
+                      <span class="enum-selected-count">已选{{ customFilter.value.length }}项</span>
+                    </template>
                     <el-option
                       v-if="getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
                       label="全选"
@@ -832,6 +838,14 @@ export default {
 }
 .compare-input .el-input {
   flex: 1;
+}
+.enum-count-select .el-select__tags {
+  display: none;
+}
+.enum-selected-count {
+  font-size: 13px;
+  color: #909399;
+  white-space: nowrap;
 }
 .filter-actions {
   display: flex;
