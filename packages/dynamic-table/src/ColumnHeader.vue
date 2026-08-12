@@ -594,8 +594,12 @@ export default {
 }
 .enum-selected-count {
   font-size: 12px;
-  color: #909399;
+  color: #606266;
   white-space: nowrap;
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 .compare-search {
   display: flex;
