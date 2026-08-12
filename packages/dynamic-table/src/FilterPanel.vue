@@ -34,7 +34,7 @@
                     />
                     <el-select
                       v-model="filterValues[meta.fieldKey]"
-                      :placeholder="'请选择' + meta.fieldLabel"
+                      :placeholder="(filterValues[meta.fieldKey] && filterValues[meta.fieldKey].length) ? '已选' + filterValues[meta.fieldKey].length + '项' : '请选择' + meta.fieldLabel"
                       multiple
                       clearable
                       filterable
@@ -42,9 +42,6 @@
                       :popper-append-to-body="popperAppendToBody"
                       style="flex: 1; min-width: 0"
                     >
-                      <template v-if="filterValues[meta.fieldKey] && filterValues[meta.fieldKey].length" slot="prefix">
-                        <span class="enum-selected-count">已选{{ filterValues[meta.fieldKey].length }}项</span>
-                      </template>
                       <el-option
                         v-if="getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
                         label="全选"
@@ -210,7 +207,7 @@
                   />
                   <el-select
                     v-model="customFilter.value"
-                    placeholder="请选择"
+                    :placeholder="(customFilter.value && customFilter.value.length) ? '已选' + customFilter.value.length + '项' : '请选择'"
                     multiple
                     clearable
                     filterable
@@ -219,9 +216,6 @@
                     :popper-append-to-body="popperAppendToBody"
                     style="flex: 1; min-width: 0"
                   >
-                    <template v-if="customFilter.value && customFilter.value.length" slot="prefix">
-                      <span class="enum-selected-count">已选{{ customFilter.value.length }}项</span>
-                    </template>
                     <el-option
                       v-if="getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
                       label="全选"
@@ -847,15 +841,7 @@ export default {
 .enum-count-select >>> .el-select__tags .el-select__input {
   padding-left: 0;
 }
-.enum-selected-count {
-  font-size: 13px;
-  color: #606266;
-  white-space: nowrap;
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-}
+
 .filter-actions {
   display: flex;
   align-items: center;
