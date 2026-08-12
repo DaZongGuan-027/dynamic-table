@@ -37,7 +37,7 @@
           <el-input
             v-model="enumFilterText"
             size="mini"
-            placeholder="过滤"
+            :placeholder="(searchValue && searchValue.length) ? '已选' + searchValue.length + '项' : '过滤'"
             clearable
             style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
           />
