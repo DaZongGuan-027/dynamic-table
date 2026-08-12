@@ -37,6 +37,7 @@
                       :placeholder="'请选择' + meta.fieldLabel"
                       multiple
                       clearable
+                      filterable
                       class="enum-count-select"
                       :popper-append-to-body="popperAppendToBody"
                       style="flex: 1; min-width: 0"
@@ -212,6 +213,7 @@
                     placeholder="请选择"
                     multiple
                     clearable
+                    filterable
                     class="enum-count-select"
                     size="small"
                     :popper-append-to-body="popperAppendToBody"
@@ -839,11 +841,11 @@ export default {
 .compare-input .el-input {
   flex: 1;
 }
-.enum-count-select >>> .el-select__tags {
+.enum-count-select >>> .el-select__tags .el-tag {
   display: none;
 }
-.enum-count-select >>> .el-input__inner {
-  padding-left: 8px;
+.enum-count-select >>> .el-select__tags .el-select__input {
+  padding-left: 0;
 }
 .enum-selected-count {
   font-size: 13px;

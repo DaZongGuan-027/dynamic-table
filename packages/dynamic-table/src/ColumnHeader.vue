@@ -47,6 +47,7 @@
             :placeholder="'选择' + fieldMeta.fieldLabel"
             multiple
             clearable
+            filterable
             class="enum-count-select"
             :popper-append-to-body="popperAppendToBody"
             style="flex: 1; min-width: 0"
@@ -586,11 +587,11 @@ export default {
   flex: 1;
   min-width: 0;
 }
-.enum-count-select >>> .el-select__tags {
+.enum-count-select >>> .el-select__tags .el-tag {
   display: none;
 }
-.enum-count-select >>> .el-input__inner {
-  padding-left: 8px;
+.enum-count-select >>> .el-select__tags .el-select__input {
+  padding-left: 0;
 }
 .enum-selected-count {
   font-size: 12px;
