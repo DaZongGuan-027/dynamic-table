@@ -854,7 +854,7 @@ export default {
 }
 .enum-select-wrapper .enum-selected-count {
   position: absolute;
-  right: 28px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   font-size: 13px;
