@@ -7,6 +7,7 @@
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
     :default-visible-fields="defaultVisibleFields"
+    :default-filter-fields="defaultFilterFields"
     :show-summary="true"
 
     row-key="id"
@@ -42,6 +43,8 @@ export default {
         'balance', 'accountingEntity', 'currency', 'auxiliaryItem',
         'maker', 'reviewer', 'bookkeeper', '__actions'
       ],
+
+      defaultFilterFields: ['accountDate', 'subjectName', 'debitAmount'],
 
       fieldMetaList: [
         { fieldKey: '__selection', fieldLabel: '选择框', fieldType: 'selection', width: 50 },

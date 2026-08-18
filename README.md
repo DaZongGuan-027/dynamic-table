@@ -42,6 +42,8 @@ export default {
 }
 ```
 
+> 组件包还具名导出了 `useTableConfig`、`useFilter` 两个内部 mixin（组件本身已集成，一般无需单独引入），供有定制需求的场景复用。
+
 ## 基础用法
 
 ```vue
@@ -134,6 +136,7 @@ export default {
 | border | Boolean | 否 | true | 是否显示边框 |
 | stripe | Boolean | 否 | true | 是否斑马纹 |
 | tableHeight | String/Number | 否 | undefined | 固定表格高度，不设置则自适应（flex 布局） |
+| maxHeight | String/Number | 否 | undefined | 表格最大高度，作为 `tableHeight` 或自适应高度的上限，超出后表格内部滚动 |
 | showPagination | Boolean | 否 | true | 是否显示分页 |
 | pageSizes | Array | 否 | [10,20,50,100] | 每页条数选项 |
 | pageSizeParamName | String | 否 | 'pageSize' | 分页大小参数名 |
@@ -145,6 +148,7 @@ export default {
 | cacheFilters | Boolean | 否 | true | 是否将筛选条件缓存到浏览器 |
 | filterPopperAppendToBody | Boolean | 否 | true | 筛选弹层是否挂载到 body |
 | defaultVisibleFields | Array | 否 | [] | 默认展示的列字段，不传则全部展示 |
+| defaultFilterFields | Array | 否 | [] | 默认展示的筛选项字段（筛选条件项的初始化值），需为 `filterable` 的字段；用户保存过筛选配置后以用户配置为准 |
 | showSummary | Boolean | 否 | false | 是否显示合计行 |
 | showUniversalFilter | Boolean | 否 | true | 是否显示万能筛选 |
 
@@ -160,6 +164,8 @@ export default {
 | filterable | Boolean | 否 | 是否可筛选 |
 | sortable | Boolean | 否 | 是否可排序 |
 | width | Number | 否 | 列最小宽度（使用 min-width，自动扩展填满容器） |
+| minWidth | Number | 否 | - | 列最小宽度，仅在 `width` 未设置时生效（兜底值） |
+| formatter | Function | 否 | - | 单元格展示格式化函数 `(value) => string`，在类型格式化之后执行 |
 | align | String | 否 | 对齐方式：`left` / `center` / `right` |
 | enumValues | Array/Object | 否 | 枚举值，支持数组 `[{ label, value }]` 或 Map `{ '001': '技术部' }` |
 | frozenPosition | String | 否 | 冻结位置：`'left'` / `'right'`，不设置则不冻结 |
@@ -193,6 +199,8 @@ export default {
 | type | String | 否 | 按钮类型，默认 `text`。可选 `primary`/`success`/`warning`/`danger`/`info`/`text` 等 |
 | icon | String | 否 | 按钮图标，如 `el-icon-edit`、`el-icon-delete` |
 | style | Object | 否 | 按钮自定义样式 |
+| visible | Boolean/Function | 否 | true | 是否显示该按钮，传函数 `(row) => boolean` 可按行动态控制 |
+| disabled | Boolean/Function | 否 | false | 是否禁用该按钮，传函数 `(row) => boolean` 可按行动态控制 |
 
 > 特殊列的 `fieldKey` 推荐使用 `__selection`、`__index`、`__actions` 前缀，组件内部通过 `fieldType` 识别。不声明对应 `fieldType` 的特殊列则不会显示。
 
@@ -237,6 +245,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 |--------|------|------|
 | selection-change | selection | 选中行变化时触发 |
 | row-action | { action, row } | 操作列按钮点击时触发，action 为 rowActions 中配置的标识 |
+| config-saved | config | 配置保存时触发，仅在未提供 `saveConfigFn` 时触发（无后端模式），config 为完整配置对象 |
 
 ### Slots
 
@@ -244,6 +253,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 |--------|-----------|------|
 | toolbar-left | - | 工具栏左侧按钮区域 |
 | column-{fieldKey} | { row, value } | 自定义列内容渲染 |
+| actions | { row } | 自定义操作列内容，覆盖默认的操作按钮渲染 |
 
 ### fetchDataFn 参数格式
 
@@ -351,6 +361,27 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 - 筛选条件默认缓存到浏览器 localStorage，可通过 `cacheFilters` 属性控制
 - 重置按钮同时清除筛选面板条件、表头搜索条件、排序和浏览器缓存
 
+### 默认筛选项
+
+通过 `defaultFilterFields` 属性可指定页面**首次加载时默认展示**的筛选项字段（对应配置抽屉"筛选配置"中勾选的结果，即内部 `filterFields` 的初始化值）：
+
+```vue
+<dynamic-table
+  menu-id="M001"
+  :field-meta-list="fieldMetaList"
+  :fetch-data-fn="fetchDataFn"
+  :default-filter-fields="['username', 'status', 'createTime']"
+/>
+```
+
+说明：
+
+- 该属性只作为筛选项的**初始化值**，仅在没有用户已保存配置时生效。
+- 传值需为 `fieldMetaList` 中 `filterable: true` 的字段，无效或重复的字段会被自动过滤，顺序按传入顺序展示。
+- 用户通过"表格配置 → 筛选配置"调整并保存后，一律以用户保存的配置为准（即使保存为空数组，也会按用户的选择不展示任何筛选项）。
+- 点击"还原默认"后，筛选项会恢复为该属性定义的默认值。
+- 不传该属性时保持原行为：默认不展示任何筛选项。
+
 ### 万能筛选
 - 筛选面板底部提供万能筛选区域，可动态选择任意字段进行筛选
 - 选择字段后自动根据字段类型渲染对应筛选控件
@@ -371,7 +402,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 ### 还原默认配置
 - 配置抽屉底部提供"还原默认"按钮
 - 点击后二次确认，确认后将所有配置还原为初始化状态
-- 还原内容包括：表头显隐/顺序/冻结/列宽、筛选字段配置、筛选方案
+- 还原内容包括：表头显隐/顺序/冻结/列宽、筛选方案；筛选字段配置还原为 `defaultFilterFields` 属性定义的默认筛选项（未传该属性则为空）
 - 同时清除浏览器中当前菜单的本地缓存
 - 还原后立即生效，表格自动刷新
 

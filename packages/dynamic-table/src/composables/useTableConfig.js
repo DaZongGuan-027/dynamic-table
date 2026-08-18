@@ -4,7 +4,8 @@ export default {
 
     fieldMetaList: { type: Array, required: true },
     loadConfigFn: { type: Function, default: null },
-    saveConfigFn: { type: Function, default: null }
+    saveConfigFn: { type: Function, default: null },
+    defaultFilterFields: { type: Array, default: () => [] }
   },
 
   data() {
@@ -61,7 +62,7 @@ export default {
           this.visibleFields = this._parseJsonField(config.visibleFields) || this._getDefaultVisibleFields()
           this.frozenFields = this._parseJsonField(config.frozenFields) || []
           this.frozenPositions = this._parseJsonField(config.frozenPositions) || {}
-          this.filterFields = this._parseJsonField(config.filterFields) || []
+          this.filterFields = this._parseJsonField(config.filterFields) || this._getDefaultFilterFields()
           this.columnOrder = this._parseJsonField(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
           this.filterSchemes = this._parseJsonField(config.filterSchemes) || []
           this.columnWidths = this._parseJsonField(config.columnWidths) || {}
@@ -102,11 +103,22 @@ export default {
       return this.fieldMetaList.map(f => f.fieldKey)
     },
 
+    _getDefaultFilterFields() {
+      if (!this.defaultFilterFields || this.defaultFilterFields.length === 0) return []
+      const seen = {}
+      return this.defaultFilterFields.filter(key => {
+        if (seen[key]) return false
+        seen[key] = true
+        const meta = this.fieldMetaMap[key]
+        return meta && meta.filterable
+      })
+    },
+
     resetToDefault() {
       this.visibleFields = this._getDefaultVisibleFields()
       this.frozenFields = []
       this.frozenPositions = {}
-      this.filterFields = []
+      this.filterFields = this._getDefaultFilterFields()
       this.columnOrder = this.fieldMetaList.map(f => f.fieldKey)
       this.filterSchemes = []
       this.columnWidths = {}

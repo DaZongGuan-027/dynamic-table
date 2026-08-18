@@ -46,6 +46,7 @@
         :row-key="getRowKey"
         :row-class-name="getRowClassName"
         :height="computedTableHeight"
+        :max-height="computedMaxTableHeight"
         v-loading="tableLoading"
 
         @selection-change="handleSelectionChange"
@@ -220,6 +221,8 @@ export default {
 
     defaultVisibleFields: { type: Array, default: () => [] },
 
+    defaultFilterFields: { type: Array, default: () => [] },
+
     filterPopperAppendToBody: { type: Boolean, default: true },
     pageParamName: { type: String, default: 'page' },
     pageSizeParamName: { type: String, default: 'pageSize' },
@@ -255,6 +258,10 @@ export default {
     computedTableHeight() {
       if (this.tableHeight) return this.tableHeight
       return '100%'
+    },
+
+    computedMaxTableHeight() {
+      return this.maxHeight || undefined
     },
 
     computedShowSummary() {
