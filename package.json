@@ -10,6 +10,8 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
+    "build:npm":"npm run build:lib:prod",
+    "push": "npm publish ",
     "build:lib": "rollup -c",
     "build:lib:prod": "NODE_ENV=production rollup -c"
   },

@@ -165,10 +165,10 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="分页配置" name="pagination">
+      <el-tab-pane label="参数配置" name="parameter">
         <div class="tab-tip">
           <i class="el-icon-info"></i>
-          设置分页条数选项和默认展示条数，最大不超过2000
+          设置表格相关参数
         </div>
         <div class="config-switch-row">
           <span class="config-switch-label">合计行</span>
@@ -181,12 +181,10 @@
               v-model="editDefaultPageSize"
               size="small"
               :min="10"
-              :max="2000"
               :step="10"
               controls-position="right"
               style="width: 160px"
             />
-            
           </div>
           <div class="pagination-config-label">分页条数选项</div>
           <div class="pagination-config-options">
@@ -203,7 +201,6 @@
               v-model="customPageSizeInput"
               size="small"
               :min="1"
-              :max="2000"
               :step="10"
               controls-position="right"
               placeholder="自定义条数"
@@ -261,18 +258,6 @@ export default {
     showUniversalFilter: { type: Boolean, default: true }
   },
 
-  computed: {
-    showSelection() {
-      return this.fieldMetaList.some(f => f.fieldType === 'selection')
-    },
-    showIndex() {
-      return this.fieldMetaList.some(f => f.fieldType === 'index')
-    },
-    showActions() {
-      return this.fieldMetaList.some(f => f.fieldType === 'actions')
-    }
-  },
-
   data() {
     return {
       activeTab: 'column',
@@ -295,12 +280,6 @@ export default {
     drawerVisible: {
       get() { return this.visible },
       set(val) { this.$emit('update:visible', val) }
-    },
-
-    filterableFieldList() {
-      return this.fieldMetaList.filter(
-        f => f.filterable && this.editColumnList.some(c => c.fieldKey === f.fieldKey && c.visible)
-      )
     },
 
     fieldMetaMap() {
@@ -392,8 +371,6 @@ export default {
         })
       })
       this.editColumnList = columnList
-
-      this.editFilterFields = [...this.filterFields]
 
       const filterableList = this.fieldMetaList.filter(
         f => f.filterable
@@ -502,14 +479,6 @@ export default {
     removePageSize(opt) {
       const idx = this.editPageSizes.indexOf(opt)
       if (idx >= 0) this.editPageSizes.splice(idx, 1)
-    },
-
-    addScheme() {
-      const currentValues = JSON.parse(JSON.stringify(this.currentFilterValues || {}))
-      this.editSchemes.push({
-        name: '方案' + (this.editSchemes.length + 1),
-        filterValues: currentValues
-      })
     },
 
     removeScheme(index) {

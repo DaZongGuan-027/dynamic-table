@@ -411,35 +411,6 @@ export default {
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
       this.searchValue = isAllSelected ? [] : [...filteredValues]
     },
-    handleEnumRemoteFilter(query) {
-      const all = this.normalizedEnumValues
-      const q = (query || '').toLowerCase()
-      if (q) {
-        this.enumHeaderFilterQuery = q
-        this.enumSearchOptions = all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
-      } else {
-        const prevQ = this.enumHeaderFilterQuery || ''
-        if (prevQ) {
-          this.enumSearchOptions = all.filter(o => (o.label + '').toLowerCase().includes(prevQ) || (o.value + '').toLowerCase().includes(prevQ))
-        } else {
-          this.enumSearchOptions = null
-        }
-      }
-    },
-    resetEnumHeaderFilter() {
-      this.enumHeaderFilterQuery = ''
-      this.enumSearchOptions = null
-    },
-    restoreEnumFilterText() {
-      if (this.enumHeaderFilterQuery) {
-        this.$nextTick(() => {
-          const input = this.$el.querySelector('.el-select__input')
-          if (input) {
-            input.value = this.enumHeaderFilterQuery
-          }
-        })
-      }
-    },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue
       this.initSearchValue()
