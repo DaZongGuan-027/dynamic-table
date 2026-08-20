@@ -98,8 +98,12 @@ export default {
       if (applyDefaults && this.cacheFilters && this._filterCacheId) {
         const cached = this._loadCachedFilters()
         if (cached) {
+          const metaMap = {}
+          this.activeFilterMetaList.forEach(meta => {
+            metaMap[meta.fieldKey] = meta
+          })
           Object.keys(cached).forEach(key => {
-            if (values[key] !== undefined) {
+            if (values[key] !== undefined && this._isCachedValueValid(metaMap[key], cached[key])) {
               values[key] = cached[key]
             }
           })
@@ -127,6 +131,26 @@ export default {
         if (raw) return JSON.parse(raw)
       } catch (e) {}
       return null
+    },
+
+    _isCachedValueValid(meta, cachedVal) {
+      if (!meta) return false
+      const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
+      if (hasEnum) return Array.isArray(cachedVal)
+      switch (meta.fieldType) {
+        case 'string':
+        case 'number':
+        case 'currency':
+          return !!cachedVal && typeof cachedVal === 'object' && !Array.isArray(cachedVal) &&
+            cachedVal.operator !== undefined && cachedVal.value !== undefined
+        case 'date':
+          return !!cachedVal && typeof cachedVal === 'object' && !Array.isArray(cachedVal) &&
+            (cachedVal.range !== undefined || cachedVal.value !== undefined)
+        case 'boolean':
+          return typeof cachedVal === 'boolean' || cachedVal === ''
+        default:
+          return !!cachedVal && typeof cachedVal === 'object' && !Array.isArray(cachedVal)
+      }
     },
 
     _saveCachedFilters() {

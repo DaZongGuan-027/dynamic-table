@@ -717,7 +717,7 @@ export default {
       const newValues = {}
       this.activeFilterMetaList.forEach(meta => {
         const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
-        if (schemeFilterValues && schemeFilterValues[meta.fieldKey] !== undefined) {
+        if (schemeFilterValues && schemeFilterValues[meta.fieldKey] !== undefined && this._isCachedValueValid(meta, schemeFilterValues[meta.fieldKey])) {
           newValues[meta.fieldKey] = JSON.parse(JSON.stringify(schemeFilterValues[meta.fieldKey]))
         } else if (hasEnum) {
           newValues[meta.fieldKey] = []
@@ -739,7 +739,7 @@ export default {
               newValues[meta.fieldKey] = ''
               break
             default:
-              newValues[meta.fieldKey] = ''
+              newValues[meta.fieldKey] = { operator: 'contains', value: '' }
           }
         }
       })

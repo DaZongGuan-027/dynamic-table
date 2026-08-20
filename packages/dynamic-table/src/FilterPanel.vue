@@ -63,7 +63,7 @@
                   </div>
                 </template>
 
-                <template v-else-if="meta.fieldType === 'string'">
+                <template v-else-if="meta.fieldType === 'string' || (meta.fieldType === 'enum' && !hasEnumOptions(meta))">
                   <div class="compare-input">
                     <el-select
                       v-model="filterValues[meta.fieldKey].operator"

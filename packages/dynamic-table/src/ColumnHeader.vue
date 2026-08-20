@@ -72,7 +72,7 @@
           </div>
           <el-button size="mini" icon="el-icon-search" type="primary" @click="handleSearchConfirm"></el-button>
         </div>
-        <div v-else-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType" class="compare-search">
+        <div v-else-if="fieldMeta.fieldType === 'string' || !fieldMeta.fieldType || (fieldMeta.fieldType === 'enum' && !hasEnumOptions)" class="compare-search">
           <el-select
             v-model="searchValue.operator"
             size="mini"
@@ -421,7 +421,7 @@ export default {
       const saved = this.columnSearchValue
       if (this.hasEnumOptions) {
         this.searchValue = Array.isArray(saved) ? [...saved] : []
-      } else if (meta.fieldType === 'string' || !meta.fieldType) {
+      } else if (meta.fieldType === 'string' || !meta.fieldType || (meta.fieldType === 'enum' && !this.hasEnumOptions)) {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
           ? { operator: saved.operator || 'contains', value: saved.value != null ? saved.value : '' }
           : { operator: 'contains', value: '' }
