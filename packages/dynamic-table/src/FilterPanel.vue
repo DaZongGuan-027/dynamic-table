@@ -18,7 +18,7 @@
           <template v-for="meta in filterMetaList">
             <div
               :key="meta.fieldKey"
-              class="filter-grid-item filter-grid-item--wide"
+              class="filter-grid-item"
             >
               <div class="filter-label">{{ meta.fieldLabel }}</div>
               <div class="filter-control">
@@ -36,14 +36,14 @@
                       <el-select
                         v-model="filterValues[meta.fieldKey]"
                         :placeholder="'请选择' + meta.fieldLabel"
-                        multiple
+                        :multiple="isEnumMultiple(meta)"
                         clearable
                         class="enum-count-select"
                         :popper-append-to-body="popperAppendToBody"
                         style="width: 100%"
                       >
                         <el-option
-                          v-if="getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
+                          v-if="isEnumMultiple(meta) && getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
                           label="全选"
                           value="__all__"
                           @click.native="handleSelectAll(meta, $event)"
@@ -56,7 +56,7 @@
                         />
                       </el-select>
                       <span
-                        v-if="filterValues[meta.fieldKey] && filterValues[meta.fieldKey].length"
+                        v-if="isEnumMultiple(meta) && filterValues[meta.fieldKey] && filterValues[meta.fieldKey].length"
                         class="enum-selected-count"
                       >已选{{ filterValues[meta.fieldKey].length }}项</span>
                     </div>
@@ -142,13 +142,14 @@
                   />
                   <el-date-picker
                     v-else-if="getDateFilterType(meta) === 'month'"
-                    v-model="filterValues[meta.fieldKey].value"
+                    :value="getSingleMonthValue(meta, filterValues[meta.fieldKey])"
                     type="month"
                     :placeholder="'选择' + meta.fieldLabel"
                     value-format="yyyy-MM"
                     clearable
                     :append-to-body="popperAppendToBody"
                     style="width: 100%"
+                    @input="handleSingleMonthInput(meta, $event)"
                   />
                   <el-date-picker
                     v-else-if="getDateFilterType(meta) === 'date'"
@@ -182,6 +183,7 @@
 
         <div class="custom-filter-section" v-if="showUniversalFilter && allDataFields.length > 0">
           <div class="custom-filter-row">
+            <div class="custom-filter-label">万能筛选</div>
             <el-select
               v-model="customFilter.fieldKey"
               placeholder="选择字段"
@@ -214,7 +216,7 @@
                     <el-select
                       v-model="customFilter.value"
                       placeholder="请选择"
-                      multiple
+                      :multiple="customFilter.multiple"
                       clearable
                       class="enum-count-select"
                       size="small"
@@ -222,7 +224,7 @@
                       style="width: 100%"
                     >
                       <el-option
-                        v-if="getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
+                        v-if="customFilter.multiple && getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
                         label="全选"
                         value="__all__"
                         @click.native="handleCustomSelectAll($event)"
@@ -235,7 +237,7 @@
                       />
                     </el-select>
                     <span
-                      v-if="customFilter.value && customFilter.value.length"
+                      v-if="customFilter.multiple && customFilter.value && customFilter.value.length"
                       class="enum-selected-count"
                     >已选{{ customFilter.value.length }}项</span>
                   </div>
@@ -273,7 +275,7 @@
                 />
                 <el-date-picker
                   v-else-if="customFilter.dateFilterType === 'month'"
-                  v-model="customFilter.value.value"
+                  :value="getCustomSingleMonthValue()"
                   type="month"
                   size="small"
                   placeholder="选择月份"
@@ -281,6 +283,7 @@
                   clearable
                   :append-to-body="popperAppendToBody"
                   style="flex: 1; min-width: 0"
+                  @input="handleCustomSingleMonthInput"
                 />
                 <el-date-picker
                   v-else-if="customFilter.dateFilterType === 'date'"
@@ -350,7 +353,7 @@
         </div>
       </div>
       <div class="filter-actions">
-        <div class="filter-actions-left">
+        <div class="filter-actions-right">
           <el-dropdown
             v-if="filterSchemes && filterSchemes.length > 0"
             trigger="click"
@@ -373,8 +376,6 @@
               </el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
-        </div>
-        <div class="filter-actions-right">
           <el-button
             size="small"
             :disabled="!hasActiveFilter"
@@ -395,6 +396,8 @@
 </template>
 
 <script>
+import { hasActiveFilterValue } from './utils/tableUtils.mjs'
+
 export default {
   name: 'FilterPanel',
 
@@ -404,6 +407,7 @@ export default {
     filterValues: { type: Object, default: () => ({}) },
     expanded: { type: Boolean, default: true },
     filterSchemes: { type: Array, default: () => [] },
+    externalFilterValues: { type: Object, default: () => ({}) },
     activeSchemeIndex: { type: Number, default: -1 },
     popperAppendToBody: { type: Boolean, default: true },
     showUniversalFilter: { type: Boolean, default: true }
@@ -416,7 +420,9 @@ export default {
         fieldKey: '',
         fieldType: '',
         dateFilterType: 'daterange',
+        monthToDateRange: false,
         hasEnum: false,
+        multiple: true,
         enumOptions: [],
         value: null
       },
@@ -530,7 +536,7 @@ export default {
     },
 
     activeFilterCount() {
-      let count = 0
+      let count = Object.keys(this.externalFilterValues).filter(key => this.isFilterValueActive(this.externalFilterValues[key])).length
       Object.keys(this.filterValues).forEach(key => {
         const val = this.filterValues[key]
         if (val === null || val === undefined || val === '') return
@@ -548,6 +554,7 @@ export default {
           count++
         }
       })
+      if (Object.keys(this.getCustomFilterValues()).length > 0) count++
       return count
     },
 
@@ -558,20 +565,56 @@ export default {
     isFilterChanged() {
       if (this.activeSchemeIndex < 0 || !this.filterSchemes[this.activeSchemeIndex]) return false
       const original = this.filterSchemes[this.activeSchemeIndex].filterValues
-      return JSON.stringify(this.filterValues) !== JSON.stringify(original)
+      return JSON.stringify(this.getSchemeFilterValues()) !== JSON.stringify(original)
     }
   },
 
   methods: {
-    isRangeType(fieldType) {
-      return fieldType === 'date' || fieldType === 'number' || fieldType === 'currency' || fieldType === 'string'
+    isFilterValueActive(value) {
+      return hasActiveFilterValue(value)
     },
     hasEnumOptions(meta) {
       return meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
     },
+    isEnumMultiple(meta) {
+      return !meta || meta.filterMultiple !== false
+    },
     getDateFilterType(meta) {
       if (meta && meta.dateFilterType) return meta.dateFilterType
       return 'daterange'
+    },
+    buildSingleMonthRange(month) {
+      if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return null
+      const parts = String(month).split('-').map(Number)
+      const lastDay = new Date(parts[0], parts[1], 0).getDate()
+      const pad = n => n < 10 ? '0' + n : String(n)
+      return [month + '-01', month + '-' + pad(lastDay)]
+    },
+    getSingleMonthValue(meta, filterValue) {
+      if (!filterValue) return null
+      if (meta && meta.monthToDateRange === true) {
+        return Array.isArray(filterValue.range) && filterValue.range.length === 2
+          ? String(filterValue.range[0]).slice(0, 7)
+          : null
+      }
+      return filterValue.value || null
+    },
+    handleSingleMonthInput(meta, month) {
+      this.$set(this.filterValues, meta.fieldKey, meta.monthToDateRange === true
+        ? { range: month ? this.buildSingleMonthRange(month) : null }
+        : { value: month || null })
+    },
+    getCustomSingleMonthValue() {
+      if (this.customFilter.monthToDateRange) {
+        const range = this.customFilter.value && this.customFilter.value.range
+        return Array.isArray(range) && range.length === 2 ? String(range[0]).slice(0, 7) : null
+      }
+      return this.customFilter.value && this.customFilter.value.value || null
+    },
+    handleCustomSingleMonthInput(month) {
+      this.customFilter.value = this.customFilter.monthToDateRange
+        ? { range: month ? this.buildSingleMonthRange(month) : null }
+        : { value: month || null }
     },
     normalizeEnumValues(enumValues) {
       if (!enumValues) return []
@@ -588,7 +631,7 @@ export default {
       return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
     },
 
-    handleEnumFilterInput(fieldKey, enumValues) {
+    handleEnumFilterInput() {
       this._saveEnumFilterText()
     },
     handleSelectAll(meta, e) {
@@ -605,21 +648,25 @@ export default {
       if (!meta) {
         cf.fieldType = ''
         cf.hasEnum = false
+        cf.multiple = true
+        cf.monthToDateRange = false
         cf.enumOptions = []
         cf.value = null
         return
       }
       cf.fieldType = meta.fieldType || 'string'
       cf.dateFilterType = this.getDateFilterType(meta)
+      cf.monthToDateRange = meta.monthToDateRange === true
       const enumOpts = this.normalizeEnumValues(meta.enumValues)
       cf.hasEnum = enumOpts.length > 0
+      cf.multiple = this.isEnumMultiple(meta)
       cf.enumOptions = enumOpts
       this.$set(this.enumFilterText, '__custom__', '')
       if (cf.hasEnum) {
-        cf.value = []
+        cf.value = cf.multiple ? [] : ''
       } else if (cf.fieldType === 'date') {
         const dft = cf.dateFilterType
-        if (dft === 'daterange' || dft === 'monthrange') {
+        if (dft === 'daterange' || dft === 'monthrange' || (dft === 'month' && cf.monthToDateRange)) {
           cf.value = { range: null }
         } else {
           cf.value = { value: null }
@@ -659,6 +706,8 @@ export default {
           if (cf.value.value !== '' && cf.value.value !== null && cf.value.value !== undefined) {
             values[cf.fieldKey] = JSON.parse(JSON.stringify(cf.value))
           }
+        } else if (cf.value.value !== '' && cf.value.value !== null && cf.value.value !== undefined) {
+          values[cf.fieldKey] = JSON.parse(JSON.stringify(cf.value))
         }
       } else if (Array.isArray(cf.value)) {
         if (cf.value.length > 0) values[cf.fieldKey] = [...cf.value]
@@ -667,11 +716,21 @@ export default {
       }
       return values
     },
+    getSchemeFilterValues() {
+      return {
+        ...JSON.parse(JSON.stringify(this.externalFilterValues)),
+        ...JSON.parse(JSON.stringify(this.filterValues)),
+        ...this.getCustomFilterValues()
+      }
+    },
     resetCustomFilters() {
       this.customFilter = {
         fieldKey: '',
         fieldType: '',
+        dateFilterType: 'daterange',
         hasEnum: false,
+        multiple: true,
+        monthToDateRange: false,
         enumOptions: [],
         value: null
       }
@@ -710,7 +769,7 @@ export default {
           type: 'warning'
         }
       ).then(() => {
-        const filterValues = JSON.parse(JSON.stringify(this.filterValues))
+        const filterValues = this.getSchemeFilterValues()
         this.$emit('save-scheme', {
           name: schemeName,
           filterValues,
@@ -735,7 +794,7 @@ export default {
         inputPattern: /\S+/,
         inputErrorMessage: '方案名称不能为空'
       }).then(({ value }) => {
-        const filterValues = JSON.parse(JSON.stringify(this.filterValues))
+        const filterValues = this.getSchemeFilterValues()
         this.$emit('save-scheme', { name: value, filterValues })
       }).catch(() => {})
     },
@@ -798,20 +857,28 @@ export default {
 }
 
 .filter-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, auto) auto;
+  column-gap: 16px;
+  row-gap: 8px;
   padding: 10px;
   padding-right: 4px;
 }
 .filter-form-scroll {
+  display: contents;
+}
+
+.filter-grid {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  gap: 8px 16px;
   max-height: 120px;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 2px;
-}
-
-.filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
-  gap: 8px 16px;
 }
 .filter-grid-item {
   display: flex;
@@ -865,30 +932,34 @@ export default {
 }
 
 .filter-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 4px;
-}
-.filter-actions-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: contents;
 }
 .filter-actions-right {
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
   align-items: center;
   gap: 8px;
+  justify-content: flex-end;
 }
 .custom-filter-section {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed #e4e7ed;
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
 }
 .custom-filter-row {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+.custom-filter-label {
+  flex-shrink: 0;
+  width: 60px;
+  margin-right: 2px;
+  font-size: 13px;
+  color: #606266;
+  text-align: right;
+  white-space: nowrap;
 }
 .custom-filter-control {
   flex: 1;
@@ -905,5 +976,19 @@ export default {
 .custom-filter-control .compare-input .el-input {
   flex: 1;
   min-width: 0;
+}
+@media (max-width: 900px) {
+  .filter-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .custom-filter-section {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .filter-actions-right {
+    grid-column: 1;
+    grid-row: 3;
+    flex-wrap: wrap;
+  }
 }
 </style>

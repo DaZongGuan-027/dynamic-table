@@ -9,6 +9,7 @@
       :filter-values="filterValues"
       :expanded="filterExpanded"
       :filter-schemes="filterSchemes"
+      :external-filter-values="columnSearchValues"
       :active-scheme-index="activeSchemeIndex"
       :popper-append-to-body="filterPopperAppendToBody"
       :show-universal-filter="computedShowUniversalFilter"
@@ -26,6 +27,16 @@
       </div>
       <div class="toolbar-right">
         <el-button
+          v-if="exportDataFn"
+          type="text"
+          icon="el-icon-download"
+          :loading="exportLoading"
+          :disabled="exportConfirming"
+          title="导出"
+          aria-label="导出"
+          @click="handleExport"
+        />
+        <el-button
           type="text"
           icon="el-icon-setting"
           @click="showConfigDrawer = true"
@@ -37,7 +48,14 @@
     </div>
 
     <div class="table-main">
+      <div v-if="dataError" class="table-state table-error-state">
+        <slot name="error" :error="dataError" :retry="retry">
+          <span>数据加载失败</span>
+          <el-button type="text" @click="retry">重试</el-button>
+        </slot>
+      </div>
       <el-table
+        v-else
         ref="elTable"
         :key="tableKey"
         :data="displayData"
@@ -47,29 +65,30 @@
         :row-class-name="getRowClassName"
         :height="computedTableHeight"
         :max-height="computedMaxTableHeight"
-        v-loading="tableLoading"
+        v-loading="tableLoading && !$scopedSlots.loading"
 
         @selection-change="handleSelectionChange"
         style="width: 100%"
       >
       <template v-for="fieldKey in allColumnOrder">
         <el-table-column
-          v-if="fieldKey === '__selection' && hasSelection && isSpecialVisible('__selection')"
+          v-if="fieldKey === selectionFieldKey && hasSelection && isSpecialVisible(fieldKey)"
           :key="fieldKey"
           type="selection"
-          :width="columnWidths['__selection'] || 50"
-          :fixed="getFrozenFixed('__selection')"
+          :width="columnWidths[fieldKey] || 50"
+          :fixed="getFrozenFixed(fieldKey)"
           :header-align="headerAlign"
           align="center"
           :selectable="isRowSelectable"
+          :reserve-selection="reserveSelection"
         />
         <el-table-column
-          v-else-if="fieldKey === '__index' && hasIndex && isSpecialVisible('__index')"
+          v-else-if="fieldKey === indexFieldKey && hasIndex && isSpecialVisible(fieldKey)"
           :key="fieldKey"
           type="index"
           label="#"
-          :width="columnWidths['__index'] || 50"
-          :fixed="getFrozenFixed('__index')"
+          :width="columnWidths[fieldKey] || 50"
+          :fixed="getFrozenFixed(fieldKey)"
           :header-align="headerAlign"
           align="center"
         >
@@ -79,10 +98,10 @@
           </template>
         </el-table-column>
         <el-table-column
-          v-else-if="fieldKey === '__actions' && hasRowActions && isSpecialVisible('__actions')"
+          v-else-if="fieldKey === actionsFieldKey && hasRowActions && isSpecialVisible(fieldKey)"
           :key="fieldKey"
           label="操作"
-          :width="columnWidths['__actions'] || actionColumnWidth"
+          :width="columnWidths[fieldKey] || actionColumnWidth"
           :fixed="getActionColumnFixed"
           :header-align="headerAlign"
           align="center"
@@ -131,8 +150,8 @@
           </template>
           <template slot-scope="scope">
             <template v-if="scope.row.__isSummaryRow">
-              <span v-if="isFirstNonSummableField(fieldKey)" class="summary-label">合计</span>
-              <span v-else-if="summableFieldKeys.includes(fieldKey)">{{ _formatCurrency(scope.row[fieldKey]) }}</span>
+              <span v-if="isSummaryLabelField(fieldKey)" class="summary-label">当前页合计</span>
+              <span v-if="summableFieldKeys.includes(fieldKey)" class="summary-value">{{ _formatCurrency(scope.row[fieldKey]) }}</span>
             </template>
             <slot
               v-else
@@ -145,7 +164,13 @@
           </template>
         </el-table-column>
       </template>
+      <template slot="empty">
+        <slot name="empty">暂无数据</slot>
+      </template>
     </el-table>
+      <div v-if="tableLoading && $scopedSlots.loading" class="table-state table-loading-state">
+        <slot name="loading"></slot>
+      </div>
     </div>
 
     <div class="table-pagination" v-if="showPagination">
@@ -172,7 +197,6 @@
       :filter-schemes="filterSchemes"
       :current-filter-values="filterValues"
       :page-sizes="computedPageSizes"
-      :default-page-size="computedDefaultPageSize"
       :show-summary="computedShowSummary"
       :show-universal-filter="computedShowUniversalFilter"
 
@@ -188,6 +212,16 @@ import ConfigDrawer from './ConfigDrawer.vue'
 import ColumnHeader from './ColumnHeader.vue'
 import useTableConfig from './composables/useTableConfig'
 import useFilter from './composables/useFilter'
+import {
+  buildExportFields,
+  getMinimumPageSize,
+  getSelectionKey,
+  hasActiveFilterValue,
+  isAbortError,
+  normalizeInFilterValue,
+  normalizeTableResponse,
+  reconcileReservedSelection
+} from './utils/tableUtils.mjs'
 
 export default {
   name: 'DynamicTable',
@@ -201,36 +235,29 @@ export default {
   mixins: [useTableConfig, useFilter],
 
   props: {
-    menuId: { type: String, required: true },
-
-    fieldMetaList: { type: Array, required: true },
     fetchDataFn: { type: Function, required: true },
-    loadConfigFn: { type: Function, default: null },
-    saveConfigFn: { type: Function, default: null },
+    dataResponseAdapter: { type: Function, default: null },
+    exportDataFn: { type: Function, default: null },
+    dataErrorHandler: { type: Function, default: null },
+    exportFileName: { type: String, default: '表格数据' },
     rowKey: { type: String, default: 'id' },
+    reserveSelection: { type: Boolean, default: false },
     border: { type: Boolean, default: true },
     stripe: { type: Boolean, default: true },
     tableHeight: { type: [String, Number], default: undefined },
     maxHeight: { type: [String, Number], default: undefined },
 
     showPagination: { type: Boolean, default: true },
-    pageSizes: { type: Array, default: () => [10, 20, 50, 100] },
+    pageSizes: { type: Array, default: () => [10, 50, 100, 500] },
     headerAlign: { type: String, default: 'center' },
 
     actionColumnWidth: { type: [String, Number], default: 150 },
 
     defaultVisibleFields: { type: Array, default: () => [] },
 
-    defaultFilterFields: { type: Array, default: () => [] },
-
     filterPopperAppendToBody: { type: Boolean, default: true },
     pageParamName: { type: String, default: 'page' },
     pageSizeParamName: { type: String, default: 'pageSize' },
-    defaultFilterValues: { type: Object, default: () => ({}) },
-    filterCacheKey: { type: String, default: '' },
-    cacheFilters: { type: Boolean, default: true },
-
-
     showSummary: { type: Boolean, default: false },
 
     showUniversalFilter: { type: Boolean, default: true }
@@ -241,6 +268,15 @@ export default {
       showConfigDrawer: false,
       tableData: [],
       tableLoading: false,
+      exportLoading: false,
+      exportConfirming: false,
+      dataError: null,
+      selectedRows: [],
+      reservedSelectionMap: {},
+      restoringSelection: false,
+      requestController: null,
+      componentReady: false,
+      reloadSequence: 0,
       tableKey: 0,
       total: 0,
       currentPage: 1,
@@ -250,7 +286,8 @@ export default {
 
       columnSearchValues: {},
       activeSchemeIndex: -1,
-      _lastCustomFilterValues: {}
+      lastCustomFilterValues: {},
+      fetchSequence: 0
     }
   },
 
@@ -265,29 +302,23 @@ export default {
     },
 
     computedShowSummary() {
-      const saved = this.columnWidths && this.columnWidths['__showSummary']
+      const saved = this.configuredShowSummary
       return saved !== undefined ? saved : this.showSummary
     },
 
     computedShowUniversalFilter() {
-      const saved = this.columnWidths && this.columnWidths['__showUniversalFilter']
+      const saved = this.configuredShowUniversalFilter
       return saved !== undefined ? saved : this.showUniversalFilter
     },
 
     computedPageSizes() {
-      const saved = this.columnWidths && this.columnWidths['__pageSizes']
+      const saved = this.configuredPageSizes
       return saved && saved.length > 0 ? saved : this.pageSizes
     },
 
-    computedDefaultPageSize() {
-      return this.columnWidths && this.columnWidths['__defaultPageSize'] || 0
-    },
-
     computedPageSize() {
-      const dps = this.computedDefaultPageSize
-      if (dps && dps >= 10 && dps <= 2000) return dps
       const ps = this.computedPageSizes
-      if (ps && ps.length > 0) return Math.min(...ps)
+      if (ps && ps.length > 0) return getMinimumPageSize(ps, this.pageSize)
       return this.pageSize
     },
 
@@ -305,8 +336,23 @@ export default {
       return this.fieldMetaList.some(f => f.fieldType === 'selection')
     },
 
+    selectionFieldKey() {
+      const meta = this.fieldMetaList.find(f => f.fieldType === 'selection')
+      return meta ? meta.fieldKey : ''
+    },
+
     hasIndex() {
       return this.fieldMetaList.some(f => f.fieldType === 'index')
+    },
+
+    indexFieldKey() {
+      const meta = this.fieldMetaList.find(f => f.fieldType === 'index')
+      return meta ? meta.fieldKey : ''
+    },
+
+    actionsFieldKey() {
+      const meta = this.fieldMetaList.find(f => f.fieldType === 'actions')
+      return meta ? meta.fieldKey : ''
     },
 
     getRowActions() {
@@ -315,18 +361,16 @@ export default {
     },
 
     specialKeys() {
-      const keys = []
-      if (this.fieldMetaList.some(f => f.fieldType === 'selection')) keys.push('__selection')
-      if (this.fieldMetaList.some(f => f.fieldType === 'index')) keys.push('__index')
-      if (this.hasRowActions) keys.push('__actions')
-      return keys
+      return this.fieldMetaList
+        .filter(f => ['selection', 'index', 'actions'].includes(f.fieldType))
+        .map(f => f.fieldKey)
     },
 
     allColumnOrder() {
-      const specialInOrder = this.columnOrder.filter(k => k.startsWith('__'))
+      const specialInOrder = this.columnOrder.filter(k => this.specialKeys.includes(k))
       const specialNotInOrder = this.specialKeys.filter(k => !specialInOrder.includes(k))
-      const prefixSpecials = specialNotInOrder.filter(k => k !== '__actions')
-      const suffixSpecials = specialNotInOrder.filter(k => k === '__actions')
+      const prefixSpecials = specialNotInOrder.filter(k => k !== this.actionsFieldKey)
+      const suffixSpecials = specialNotInOrder.filter(k => k === this.actionsFieldKey)
       const hasLeftFrozen = this.frozenLeftColumns.length > 0
       const unfrozenPrefix = prefixSpecials.filter(k => !this.frozenFields.includes(k))
       const frozenPrefix = prefixSpecials.filter(k => this.frozenFields.includes(k))
@@ -337,7 +381,9 @@ export default {
     },
 
     getActionColumnFixed() {
-      const pos = this.frozenPositions['__actions']
+      const actionKey = this.actionsFieldKey
+      if (!actionKey || !this.frozenFields.includes(actionKey)) return false
+      const pos = this.frozenPositions[actionKey]
       if (pos === 'left') return 'left'
       if (pos === 'right') return 'right'
       return false
@@ -351,20 +397,6 @@ export default {
         const meta = this.fieldMetaMap[key]
         return !meta || meta.frozenPosition !== 'right'
       })
-    },
-
-    frozenRightColumns() {
-      return this.orderedVisibleFields.filter(key => {
-        if (!this.frozenFields.includes(key)) return false
-        const pos = this.frozenPositions[key]
-        if (pos) return pos === 'right'
-        const meta = this.fieldMetaMap[key]
-        return meta && meta.frozenPosition === 'right'
-      })
-    },
-
-    normalColumns() {
-      return this.orderedVisibleFields.filter(key => !this.frozenFields.includes(key))
     },
 
     summableFields() {
@@ -390,7 +422,7 @@ export default {
 
     displayData() {
       if (!this.computedShowSummary || this.tableData.length === 0) return this.tableData
-      const summaryRow = { __isSummaryRow: true }
+      const summaryRow = { __isSummaryRow: true, __summaryType: 'page' }
       this.summableFieldKeys.forEach(key => {
         summaryRow[key] = this.pageSummaryData[key] || 0
       })
@@ -398,10 +430,53 @@ export default {
     }
   },
 
-  created() {
-    this.loadConfig().then(() => {
+  watch: {
+    menuId() {
+      this.reload()
+    },
+    fieldMetaList: {
+      deep: true,
+      handler() {
+        if (!this.componentReady) return
+        this.reconcileConfigWithFields()
+        this.$nextTick(() => { this.doLayout(); this.fetchData() })
+      }
+    },
+    pageSizes() {
+      if (!this.componentReady || this.configuredPageSizes) return
+      this.pageSize = this.computedPageSize
+      this.currentPage = 1
       this.fetchData()
-    })
+    },
+    defaultFilterFields() {
+      if (!this.componentReady || this.config) return
+      this.filterFields = this._getDefaultFilterFields()
+      this.initFilterValues(true)
+      this.fetchData()
+    },
+    defaultVisibleFields() {
+      if (!this.componentReady || this.config) return
+      this.visibleFields = this._getDefaultVisibleFields()
+      this.doLayout()
+    },
+    reserveSelection(value) {
+      if (!value) {
+        this.clearSelection()
+      } else {
+        const map = {}
+        this.selectedRows.forEach(row => { map[this.getSelectionKey(row)] = row })
+        this.reservedSelectionMap = map
+        this.restoreReservedSelection()
+      }
+    },
+    rowKey() {
+      this.clearSelection()
+    }
+  },
+
+  created() {
+    this.pageSize = this.computedPageSize
+    this.reload()
   },
 
   mounted() {
@@ -417,6 +492,7 @@ export default {
   },
 
   beforeDestroy() {
+    if (this.requestController) this.requestController.abort()
   },
 
   methods: {
@@ -434,73 +510,189 @@ export default {
       return !row.__isSummaryRow
     },
 
-    isFirstNonSummableField(fieldKey) {
-      const firstKey = this.orderedVisibleFields.find(k => {
-        if (!this.isDataField(k)) return false
+    isSummaryLabelField(fieldKey) {
+      const visibleDataFields = this.orderedVisibleFields.filter(k => this.isDataField(k))
+      const firstKey = visibleDataFields.find(k => {
         return !this.summableFieldKeys.includes(k)
-      })
+      }) || visibleDataFields[0]
       return fieldKey === firstKey
     },
 
-
     async fetchData() {
+      const requestId = ++this.fetchSequence
+      if (this.requestController) this.requestController.abort()
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+      this.requestController = controller
       this.tableLoading = true
+      this.dataError = null
       try {
-        const mergedFilters = { ...this.activeFilters }
-        Object.keys(this.columnSearchValues).forEach(key => {
-          const val = this.columnSearchValues[key]
-          if (val !== null && val !== undefined && val !== '') {
-            mergedFilters[key] = val
-          }
-        })
-        if (this._lastCustomFilterValues) {
-          Object.keys(this._lastCustomFilterValues).forEach(key => {
-            mergedFilters[key] = this._lastCustomFilterValues[key]
-          })
-        }
         const params = {
           [this.pageParamName]: this.currentPage,
           [this.pageSizeParamName]: this.pageSize,
-          filters: mergedFilters,
+          filters: this.buildRequestFilters(),
           sortBy: this.currentSortBy,
           sortOrder: this.currentSortOrder
         }
-        const result = await this.fetchDataFn(params)
-        this.tableData = result.list || []
-        this.total = result.total || 0
+        const response = await this.fetchDataFn(params, { signal: controller ? controller.signal : undefined })
+        if (requestId !== this.fetchSequence) return
+        const adaptedResult = this.dataResponseAdapter
+          ? this.dataResponseAdapter(response)
+          : normalizeTableResponse(response)
+        const result = adaptedResult || {}
+        this.tableData = Array.isArray(result.list) ? result.list : []
+        this.total = Number.isFinite(Number(result.total)) ? Number(result.total) : 0
 
         this.$nextTick(() => {
           this.$nextTick(() => {
             if (this.$refs.elTable) this.$refs.elTable.doLayout()
+            this.restoreReservedSelection()
           })
         })
       } catch (e) {
+        if (requestId !== this.fetchSequence) return
+        if (isAbortError(e)) return
         console.error('获取表格数据失败:', e)
         this.tableData = []
         this.total = 0
+        this.dataError = e
+        this.$emit('data-error', e)
+        if (this.dataErrorHandler) {
+          try { this.dataErrorHandler(e) } catch (handlerError) { console.error('dataErrorHandler 执行失败:', handlerError) }
+        }
       } finally {
-        this.tableLoading = false
+        if (requestId === this.fetchSequence) {
+          this.tableLoading = false
+          if (this.requestController === controller) this.requestController = null
+        }
       }
+    },
+
+    buildRequestFilters() {
+      const mergedFilters = { ...this.activeFilters }
+      Object.keys(this.columnSearchValues).forEach(key => {
+        const val = this.columnSearchValues[key]
+        if (val !== null && val !== undefined && val !== '') mergedFilters[key] = val
+      })
+      if (this.lastCustomFilterValues) {
+        Object.keys(this.lastCustomFilterValues).forEach(key => {
+          mergedFilters[key] = this.lastCustomFilterValues[key]
+        })
+      }
+      const requestFilters = {}
+      Object.keys(mergedFilters).forEach(key => {
+        const value = this.normalizeFilterValueForRequest(key, mergedFilters[key])
+        if (hasActiveFilterValue(value)) requestFilters[key] = value
+      })
+      return requestFilters
+    },
+
+    getExportFields() {
+      return buildExportFields(this.allColumnOrder, this.orderedVisibleFields, this.fieldMetaMap)
+    },
+
+    async handleExport() {
+      if (!this.exportDataFn || this.exportLoading || this.exportConfirming) return
+      const fields = this.getExportFields()
+      if (fields.length === 0) {
+        this.$message.warning('当前没有可导出的字段')
+        return
+      }
+      this.exportConfirming = true
+      try {
+        await this.$confirm('将根据表头配置进行导出，是否确认？', '提示', {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+      } catch (e) {
+        return
+      } finally {
+        this.exportConfirming = false
+      }
+      this.exportLoading = true
+      try {
+        const result = await this.exportDataFn({
+          menuId: this.menuId,
+          fields,
+          filters: this.buildRequestFilters(),
+          sortBy: this.currentSortBy,
+          sortOrder: this.currentSortOrder
+        })
+        this.downloadExportResult(result)
+        this.$emit('export-success', result)
+      } catch (e) {
+        console.error('导出表格数据失败:', e)
+        this.$message.error('导出失败')
+        this.$emit('export-error', e)
+      } finally {
+        this.exportLoading = false
+      }
+    },
+
+    downloadExportResult(result) {
+      const response = result && result.data instanceof Blob ? result : null
+      const payload = response ? response.data : result
+      if (payload && payload.downloadUrl) {
+        this.triggerDownload(payload.downloadUrl, payload.fileName || this.exportFileName)
+        return
+      }
+      const blob = payload && payload.blob instanceof Blob ? payload.blob : payload
+      if (!(blob instanceof Blob)) throw new Error('exportDataFn 必须返回 Blob、{ blob } 或 { downloadUrl }')
+      const headerName = response ? this.getFileNameFromHeaders(response.headers) : ''
+      const fileName = payload && payload.fileName ? payload.fileName : (headerName || this.resolveExportFileName(blob))
+      const objectUrl = URL.createObjectURL(blob)
+      this.triggerDownload(objectUrl, fileName)
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+    },
+
+    getFileNameFromHeaders(headers) {
+      if (!headers) return ''
+      const disposition = headers['content-disposition'] || headers['Content-Disposition'] || ''
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      if (utf8Match) {
+        try { return decodeURIComponent(utf8Match[1]) } catch (e) { return utf8Match[1] }
+      }
+      const match = disposition.match(/filename="?([^";]+)"?/i)
+      return match ? match[1] : ''
+    },
+
+    resolveExportFileName(blob) {
+      if (/\.[a-z0-9]+$/i.test(this.exportFileName)) return this.exportFileName
+      const type = blob.type || ''
+      if (type.includes('csv')) return this.exportFileName + '.csv'
+      if (type.includes('spreadsheetml')) return this.exportFileName + '.xlsx'
+      return this.exportFileName
+    },
+
+    triggerDownload(url, fileName) {
+      const link = document.createElement('a')
+      link.href = url
+      if (fileName) link.download = fileName
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
     },
 
     formatCellValue(value, meta) {
       if (!meta) return value
       if (value === null || value === undefined || value === '') return ''
+      let formattedValue = value
       const enumList = this._normalizeEnumValues(meta.enumValues)
       if (enumList.length > 0) {
-        const found = enumList.find(v => v.value === value)
-        if (found) return found.label
+        const found = enumList.find(v => String(v.value) === String(value))
+        if (found) formattedValue = found.label
       }
-      if (meta.fieldType === 'currency') {
-        return this._formatCurrency(value)
+      if (meta.fieldType === 'currency' && formattedValue === value) {
+        formattedValue = this._formatCurrency(value)
       }
       if (meta.fieldType === 'date') {
-        return this._formatDate(value, meta.dateFormat)
+        formattedValue = this._formatDate(value, meta.dateFormat)
       }
       if (meta.formatter && typeof meta.formatter === 'function') {
-        return meta.formatter(value)
+        return meta.formatter(formattedValue)
       }
-      return value
+      return formattedValue
     },
 
     isSpecialVisible(key) {
@@ -510,7 +702,8 @@ export default {
     },
 
     isDataField(key) {
-      return !key.startsWith('__')
+      const meta = this.fieldMetaMap[key]
+      return !!meta && !['selection', 'index', 'actions'].includes(meta.fieldType)
     },
 
     _formatCurrency(value) {
@@ -521,17 +714,25 @@ export default {
 
     _formatDate(value, dateFormat) {
       if (!value) return ''
-      const d = new Date(value)
-      if (isNaN(d.getTime())) return value
       const fmt = dateFormat || 'yyyy-MM-dd'
-      const pad = n => String(n).padStart(2, '0')
+      const literalMatch = String(value).match(/^(\d{4})-(\d{2})(?:-(\d{2}))?(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/)
+      let parts
+      if (literalMatch) {
+        parts = literalMatch.slice(1)
+        if (!parts[2]) parts[2] = '01'
+      } else {
+        const d = new Date(value)
+        if (isNaN(d.getTime())) return value
+        const pad = n => n < 10 ? '0' + n : String(n)
+        parts = [String(d.getFullYear()), pad(d.getMonth() + 1), pad(d.getDate()), pad(d.getHours()), pad(d.getMinutes()), pad(d.getSeconds())]
+      }
       return fmt
-        .replace('yyyy', d.getFullYear())
-        .replace('MM', pad(d.getMonth() + 1))
-        .replace('dd', pad(d.getDate()))
-        .replace('HH', pad(d.getHours()))
-        .replace('mm', pad(d.getMinutes()))
-        .replace('ss', pad(d.getSeconds()))
+        .replace('yyyy', parts[0])
+        .replace('MM', parts[1])
+        .replace('dd', parts[2])
+        .replace('HH', parts[3] || '00')
+        .replace('mm', parts[4] || '00')
+        .replace('ss', parts[5] || '00')
     },
 
     _normalizeEnumValues(enumValues) {
@@ -541,6 +742,27 @@ export default {
         return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
       }
       return []
+    },
+
+    normalizeFilterValueForRequest(fieldKey, value) {
+      const normalizedInValue = normalizeInFilterValue(value)
+      if (normalizedInValue !== value) return normalizedInValue
+      const meta = this.fieldMetaMap[fieldKey]
+      if (
+        meta &&
+        meta.fieldType === 'date' &&
+        meta.dateFilterType === 'month' &&
+        meta.monthToDateRange === true &&
+        value && typeof value === 'object' && !Array.isArray(value)
+      ) {
+        if (Array.isArray(value.range) && value.range.length === 2) {
+          return this._buildDateRangeFilter(meta, value.range)
+        }
+        if (/^\d{4}-\d{2}$/.test(String(value.value || ''))) {
+          return this._buildDateRangeFilter(meta, [value.value, value.value])
+        }
+      }
+      return value
     },
 
     getFrozenFixed(fieldKey) {
@@ -581,7 +803,49 @@ export default {
 
     handleSelectionChange(selection) {
       const filtered = selection.filter(row => !row.__isSummaryRow)
-      this.$emit('selection-change', filtered)
+      if (this.restoringSelection) return
+      if (!this.reserveSelection) {
+        this.selectedRows = filtered
+        this.$emit('selection-change', filtered)
+        return
+      }
+      this.reservedSelectionMap = reconcileReservedSelection(
+        this.reservedSelectionMap,
+        this.tableData,
+        filtered,
+        this.rowKey
+      )
+      this.selectedRows = Object.keys(this.reservedSelectionMap).map(key => this.reservedSelectionMap[key])
+      this.$emit('selection-change', [...this.selectedRows])
+    },
+
+    getSelectionKey(row) {
+      return getSelectionKey(row, this.rowKey)
+    },
+
+    restoreReservedSelection() {
+      if (!this.reserveSelection || !this.$refs.elTable) return
+      this.restoringSelection = true
+      this.tableData.forEach(row => {
+        if (this.reservedSelectionMap[this.getSelectionKey(row)]) {
+          this.$refs.elTable.toggleRowSelection(row, true)
+        }
+      })
+      this.$nextTick(() => { this.restoringSelection = false })
+    },
+
+    getSelection() {
+      return [...this.selectedRows]
+    },
+
+    clearSelection() {
+      this.selectedRows = []
+      this.reservedSelectionMap = {}
+      if (this.$refs.elTable) this.$refs.elTable.clearSelection()
+    },
+
+    toggleRowSelection(row, selected) {
+      if (this.$refs.elTable) this.$refs.elTable.toggleRowSelection(row, selected)
     },
 
     handleResetDefault() {
@@ -594,7 +858,7 @@ export default {
       this.currentSortOrder = ''
       this.activeSchemeIndex = -1
       this.currentPage = 1
-      this._lastCustomFilterValues = {}
+      this.lastCustomFilterValues = {}
       if (this.$refs.filterPanel) this.$refs.filterPanel.resetCustomFilters()
       this.scrollFilterToTop()
       this.saveConfig()
@@ -608,7 +872,7 @@ export default {
 
     applyFilters(customFilterValues) {
       this._saveCachedFilters()
-      this._lastCustomFilterValues = customFilterValues || {}
+      this.lastCustomFilterValues = customFilterValues || {}
       this.currentPage = 1
       this.fetchData()
     },
@@ -621,7 +885,7 @@ export default {
       this.currentSortOrder = ''
       this.activeSchemeIndex = -1
       this.currentPage = 1
-      this._lastCustomFilterValues = {}
+      this.lastCustomFilterValues = {}
       if (this.$refs.filterPanel) this.$refs.filterPanel.resetCustomFilters()
       this.scrollFilterToTop()
       this.fetchData()
@@ -660,7 +924,7 @@ export default {
     },
 
     handleSaveScheme(scheme) {
-      const mergedFilterValues = this.getMergedFilterValues()
+      const mergedFilterValues = this.getMergedFilterValues(scheme.filterValues)
       if (scheme.overwriteIndex !== undefined && scheme.overwriteIndex >= 0) {
         this.$set(this.filterSchemes, scheme.overwriteIndex, {
           name: scheme.name,
@@ -680,10 +944,10 @@ export default {
       this._saveCachedEnumFilterText(textMap)
     },
 
-    getMergedFilterValues() {
+    getMergedFilterValues(currentPanelValues) {
       const merged = {}
-      Object.keys(this.filterValues).forEach(key => {
-        const val = this.filterValues[key]
+      const mergeValues = values => Object.keys(values || {}).forEach(key => {
+        const val = values[key]
         if (val !== null && val !== undefined && val !== '') {
           if (typeof val === 'object' && !Array.isArray(val)) {
             if (Object.keys(val).some(function(k) { return val[k] !== null && val[k] !== undefined && val[k] !== '' })) {
@@ -696,20 +960,10 @@ export default {
           }
         }
       })
-      Object.keys(this.columnSearchValues).forEach(key => {
-        const val = this.columnSearchValues[key]
-        if (val !== null && val !== undefined && val !== '') {
-          if (typeof val === 'object' && !Array.isArray(val)) {
-            if (Object.keys(val).some(function(k) { return val[k] !== null && val[k] !== undefined && val[k] !== '' })) {
-              merged[key] = JSON.parse(JSON.stringify(val))
-            }
-          } else if (Array.isArray(val)) {
-            if (val.length > 0) merged[key] = JSON.parse(JSON.stringify(val))
-          } else {
-            merged[key] = val
-          }
-        }
-      })
+      mergeValues(this.filterValues)
+      mergeValues(this.columnSearchValues)
+      mergeValues(this.lastCustomFilterValues)
+      if (currentPanelValues) mergeValues(currentPanelValues)
       return merged
     },
 
@@ -720,7 +974,7 @@ export default {
         if (schemeFilterValues && schemeFilterValues[meta.fieldKey] !== undefined && this._isCachedValueValid(meta, schemeFilterValues[meta.fieldKey])) {
           newValues[meta.fieldKey] = JSON.parse(JSON.stringify(schemeFilterValues[meta.fieldKey]))
         } else if (hasEnum) {
-          newValues[meta.fieldKey] = []
+          newValues[meta.fieldKey] = meta.filterMultiple === false ? '' : []
         } else {
           switch (meta.fieldType) {
             case 'number':
@@ -729,7 +983,7 @@ export default {
               break
             case 'date':
               const dft = meta.dateFilterType || 'daterange'
-              if (dft === 'daterange' || dft === 'monthrange') {
+              if (dft === 'daterange' || dft === 'monthrange' || (dft === 'month' && meta.monthToDateRange === true)) {
                 newValues[meta.fieldKey] = { range: null }
               } else {
                 newValues[meta.fieldKey] = { value: null }
@@ -748,6 +1002,45 @@ export default {
 
     getElTable() {
       return this.$refs.elTable
+    },
+
+    refresh() {
+      return this.fetchData()
+    },
+
+    retry() {
+      return this.fetchData()
+    },
+
+    getFilters() {
+      return JSON.parse(JSON.stringify(this.buildRequestFilters()))
+    },
+
+    getTableConfig() {
+      return this._buildConfig()
+    },
+
+    async reload() {
+      const reloadId = ++this.reloadSequence
+      this.fetchSequence++
+      if (this.requestController) {
+        this.requestController.abort()
+        this.requestController = null
+      }
+      this.dataError = null
+      this.currentPage = 1
+      this.currentSortBy = ''
+      this.currentSortOrder = ''
+      this.columnSearchValues = {}
+      this.lastCustomFilterValues = {}
+      this.activeSchemeIndex = -1
+      this.clearSelection()
+      this.config = null
+      await this.loadConfig()
+      if (reloadId !== this.reloadSequence) return
+      this.initFilterValues(true)
+      this.componentReady = true
+      return this.fetchData()
     },
 
     doLayout() {
@@ -821,9 +1114,24 @@ export default {
   gap: 4px;
 }
 .table-main {
+  position: relative;
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+}
+.table-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 160px;
+  color: #909399;
+}
+.table-loading-state {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.82);
 }
 .table-pagination {
   display: flex;
@@ -842,5 +1150,8 @@ export default {
   font-size: 12px;
   color: #606266;
   white-space: nowrap;
+}
+.summary-label + .summary-value {
+  margin-left: 6px;
 }
 </style>

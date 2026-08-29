@@ -1,17 +1,23 @@
 {
   "name": "dynamic-table-vue2-element",
-  "version": "1.5.5",
+  "version": "1.8.0",
   "description": "基于 Vue2 + Element UI 的动态配置表格组件",
   "main": "lib/dynamic-table.umd.js",
   "module": "lib/dynamic-table.esm.js",
+  "types": "types/index.d.ts",
   "files": [
-    "lib"
+    "lib",
+    "types"
   ],
   "scripts": {
     "serve": "vue-cli-service serve",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm test && npm run build:lib",
+    "prepublishOnly": "npm test && npm run build:lib:prod",
     "build": "vue-cli-service build",
     "build:npm":"npm run build:lib:prod",
     "push": "npm publish ",
+    "login": "npm login ",
     "build:lib": "rollup -c",
     "build:lib:prod": "NODE_ENV=production rollup -c"
   },

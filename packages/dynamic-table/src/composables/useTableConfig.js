@@ -1,3 +1,11 @@
+import {
+  getMinimumPageSize,
+  parseJsonArray,
+  parseJsonObject,
+  readTableSettings,
+  unwrapResponseData
+} from '../utils/tableUtils.mjs'
+
 export default {
   props: {
     menuId: { type: String, required: true },
@@ -5,12 +13,19 @@ export default {
     fieldMetaList: { type: Array, required: true },
     loadConfigFn: { type: Function, default: null },
     saveConfigFn: { type: Function, default: null },
+    configResponseAdapter: { type: Function, default: null },
+    configErrorHandler: { type: Function, default: null },
     defaultFilterFields: { type: Array, default: () => [] }
   },
 
   data() {
     return {
       configLoading: false,
+      configSaving: false,
+      configError: null,
+      configLoadFailed: false,
+      configSaveQueue: null,
+      configSaveSequence: 0,
       config: null,
       visibleFields: [],
       frozenFields: [],
@@ -18,7 +33,11 @@ export default {
       filterFields: [],
       columnOrder: [],
       filterSchemes: [],
-      columnWidths: {}
+      columnWidths: {},
+      configuredPageSizes: null,
+      configuredShowSummary: undefined,
+      configuredShowUniversalFilter: undefined,
+      configLoadSequence: 0
     }
   },
 
@@ -50,49 +69,71 @@ export default {
 
   methods: {
     async loadConfig() {
+      const requestId = ++this.configLoadSequence
       if (!this.loadConfigFn) {
+        this.configError = null
+        this.configLoadFailed = false
+        this.config = null
         this.resetToDefault()
         return
       }
       this.configLoading = true
       try {
-          const config = await this.loadConfigFn(this.menuId)
+        const response = await this.loadConfigFn(this.menuId)
+        if (requestId !== this.configLoadSequence) return
+        let config = this.configResponseAdapter
+          ? this.configResponseAdapter(response)
+          : unwrapResponseData(response)
+        if (config && (typeof config !== 'object' || Array.isArray(config))) {
+          throw new Error('配置接口返回值必须是对象或 null')
+        }
+        if (config && Object.keys(config).length === 0) config = null
+        this.configError = null
+        this.configLoadFailed = false
         if (config) {
           this.config = config
-          this.visibleFields = this._parseJsonField(config.visibleFields) || this._getDefaultVisibleFields()
-          this.frozenFields = this._parseJsonField(config.frozenFields) || []
-          this.frozenPositions = this._parseJsonField(config.frozenPositions) || {}
-          this.filterFields = this._parseJsonField(config.filterFields) || this._getDefaultFilterFields()
-          this.columnOrder = this._parseJsonField(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
-          this.filterSchemes = this._parseJsonField(config.filterSchemes) || []
-          this.columnWidths = this._parseJsonField(config.columnWidths) || {}
+          this.visibleFields = parseJsonArray(config.visibleFields) || this._getDefaultVisibleFields()
+          this.frozenFields = parseJsonArray(config.frozenFields) || []
+          this.frozenPositions = parseJsonObject(config.frozenPositions) || {}
+          this.filterFields = parseJsonArray(config.filterFields) || this._getDefaultFilterFields()
+          this.columnOrder = parseJsonArray(config.columnOrder) || this.fieldMetaList.map(f => f.fieldKey)
+          this.filterSchemes = parseJsonArray(config.filterSchemes) || []
+          this.columnWidths = parseJsonObject(config.columnWidths) || {}
+          const settings = readTableSettings(config, this.columnWidths)
+          this.configuredPageSizes = settings.pageSizes
+          this.configuredShowSummary = settings.showSummary
+          this.configuredShowUniversalFilter = settings.showUniversalFilter
+          this.$delete(this.columnWidths, '__defaultPageSize')
+          this.$delete(this.columnWidths, '__pageSizes')
+          this.$delete(this.columnWidths, '__showSummary')
+          this.$delete(this.columnWidths, '__showUniversalFilter')
+          this.reconcileConfigWithFields()
           this._initPageSizeFromConfig()
 
         } else {
+          this.config = null
           this.resetToDefault()
         }
       } catch (e) {
+        if (requestId !== this.configLoadSequence) return
+        this.configError = e
+        this.configLoadFailed = true
+        this.$emit('config-error', e)
+        if (this.configErrorHandler) {
+          try { this.configErrorHandler(e) } catch (handlerError) { console.error('configErrorHandler 执行失败:', handlerError) }
+        }
         this.resetToDefault()
       } finally {
-        this.configLoading = false
+        if (requestId === this.configLoadSequence) this.configLoading = false
       }
-    },
-
-    _parseJsonField(val) {
-      if (Array.isArray(val)) return val
-      if (typeof val === 'string') {
-        try { return JSON.parse(val) } catch (e) { return null }
-      }
-      return null
     },
 
     _initPageSizeFromConfig() {
-      const dps = this.columnWidths && this.columnWidths['__defaultPageSize']
-      const ps = this.columnWidths && this.columnWidths['__pageSizes']
-      if (dps && dps >= 10 && dps <= 2000) {
-        this.pageSize = dps
-      } else if (ps && ps.length > 0) {
-        this.pageSize = Math.min(...ps)
+      const ps = this.configuredPageSizes
+      if (ps && ps.length > 0) {
+        this.pageSize = getMinimumPageSize(ps, this.pageSize)
+      } else if (this.pageSizes && this.pageSizes.length > 0) {
+        this.pageSize = getMinimumPageSize(this.pageSizes, this.pageSize)
       }
     },
 
@@ -122,11 +163,16 @@ export default {
       this.columnOrder = this.fieldMetaList.map(f => f.fieldKey)
       this.filterSchemes = []
       this.columnWidths = {}
-      this.$set(this.columnWidths, '__showSummary', this.showSummary)
-      this.$set(this.columnWidths, '__showUniversalFilter', this.showUniversalFilter)
+      this.configuredPageSizes = null
+      this.configuredShowSummary = undefined
+      this.configuredShowUniversalFilter = undefined
+      if (this.pageSizes && this.pageSizes.length > 0) {
+        this.pageSize = getMinimumPageSize(this.pageSizes, this.pageSize)
+      }
     },
 
     clearStorageConfig() {
+      if (typeof localStorage === 'undefined') return
       const key = 'dynamic_table_config_' + this.menuId
       const keysToRemove = []
       for (let i = 0; i < localStorage.length; i++) {
@@ -139,22 +185,40 @@ export default {
     },
 
     async saveConfig() {
+      if (this.configLoadFailed) {
+        const error = new Error('配置加载失败，为避免覆盖服务端配置，本次保存已阻止')
+        this.$message.error(error.message)
+        this.$emit('config-save-blocked', error)
+        return
+      }
       if (!this.saveConfigFn) {
-        this.$emit('config-saved', this._buildConfig())
+        const config = this._buildConfig()
+        this.config = config
+        this.$emit('config-saved', config)
         return
       }
       const config = this._buildConfig()
+      const requestId = ++this.configSaveSequence
+      const queuedSave = (this.configSaveQueue || Promise.resolve())
+        .catch(() => {})
+        .then(() => this.saveConfigFn(config))
+      this.configSaveQueue = queuedSave
+      this.configSaving = true
       try {
-        await this.saveConfigFn(config)
+        await queuedSave
         this.config = config
         this.$message.success('配置已保存')
       } catch (e) {
         this.$message.error('配置保存失败')
+        this.$emit('config-save-error', e)
+      } finally {
+        if (requestId === this.configSaveSequence) this.configSaving = false
       }
     },
 
     _buildConfig() {
       return {
+        version: 2,
         menuId: this.menuId,
 
         visibleFields: JSON.stringify(this.visibleFields),
@@ -163,11 +227,16 @@ export default {
         filterFields: JSON.stringify(this.filterFields),
         columnOrder: JSON.stringify(this.columnOrder),
         filterSchemes: JSON.stringify(this.filterSchemes),
-        columnWidths: JSON.stringify(this.columnWidths)
+        columnWidths: JSON.stringify(this.columnWidths),
+        settings: JSON.stringify({
+          pageSizes: this.configuredPageSizes,
+          showSummary: this.configuredShowSummary,
+          showUniversalFilter: this.configuredShowUniversalFilter
+        })
       }
     },
 
-    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, defaultPageSize, showSummary, showUniversalFilter }) {
+    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, showSummary, showUniversalFilter }) {
       this.visibleFields = visibleFields
       this.columnOrder = columnOrder
       this.frozenFields = frozenFields
@@ -175,22 +244,13 @@ export default {
       this.columnWidths = columnWidths || {}
       this.filterFields = filterFields
       this.filterSchemes = filterSchemes
-      if (pageSizes) {
-        this.$set(this.columnWidths, '__pageSizes', pageSizes)
-      }
-      if (defaultPageSize !== undefined) {
-        this.$set(this.columnWidths, '__defaultPageSize', defaultPageSize)
-      }
-      if (showSummary !== undefined) {
-        this.$set(this.columnWidths, '__showSummary', showSummary)
-      }
-      if (showUniversalFilter !== undefined) {
-        this.$set(this.columnWidths, '__showUniversalFilter', showUniversalFilter)
-      }
-      if (defaultPageSize && defaultPageSize >= 10 && defaultPageSize <= 2000) {
-        this.pageSize = defaultPageSize
-      } else if (pageSizes && pageSizes.length > 0) {
-        this.pageSize = Math.min(...pageSizes)
+      this.configuredPageSizes = pageSizes && pageSizes.length > 0 ? pageSizes : null
+      if (showSummary !== undefined) this.configuredShowSummary = showSummary
+      if (showUniversalFilter !== undefined) this.configuredShowUniversalFilter = showUniversalFilter
+      if (pageSizes && pageSizes.length > 0) {
+        this.pageSize = getMinimumPageSize(pageSizes, this.pageSize)
+      } else if (this.pageSizes && this.pageSizes.length > 0) {
+        this.pageSize = getMinimumPageSize(this.pageSizes, this.pageSize)
       }
       this.saveConfig()
       this.tableKey++
@@ -202,6 +262,22 @@ export default {
 
     handleApplyScheme(filterValues) {
       this.$emit('apply-scheme', filterValues)
+    },
+
+    reconcileConfigWithFields() {
+      const validKeys = this.fieldMetaList.map(field => field.fieldKey)
+      const validSet = new Set(validKeys)
+      const configuredSet = new Set(this.columnOrder)
+      const newKeys = validKeys.filter(key => !configuredSet.has(key))
+      this.columnOrder = this.columnOrder.filter(key => validSet.has(key)).concat(newKeys)
+      this.visibleFields = this.visibleFields.filter(key => validSet.has(key))
+      newKeys.forEach(key => {
+        if (!this.defaultVisibleFields.length || this.defaultVisibleFields.includes(key)) this.visibleFields.push(key)
+      })
+      this.frozenFields = this.frozenFields.filter(key => validSet.has(key))
+      this.filterFields = this.filterFields.filter(key => validSet.has(key) && this.fieldMetaMap[key] && this.fieldMetaMap[key].filterable)
+      Object.keys(this.frozenPositions).forEach(key => { if (!validSet.has(key)) this.$delete(this.frozenPositions, key) })
+      Object.keys(this.columnWidths).forEach(key => { if (!validSet.has(key)) this.$delete(this.columnWidths, key) })
     }
   }
 }

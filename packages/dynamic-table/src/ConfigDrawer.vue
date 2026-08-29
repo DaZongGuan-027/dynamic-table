@@ -175,17 +175,6 @@
           <el-switch v-model="editShowSummary" active-text="开启" inactive-text="关闭" />
         </div>
         <div class="pagination-config">
-          <div class="pagination-config-label">默认展示条数</div>
-          <div class="pagination-config-default-size">
-            <el-input-number
-              v-model="editDefaultPageSize"
-              size="small"
-              :min="10"
-              :step="10"
-              controls-position="right"
-              style="width: 160px"
-            />
-          </div>
           <div class="pagination-config-label">分页条数选项</div>
           <div class="pagination-config-options">
             <div
@@ -252,8 +241,7 @@ export default {
     columnOrder: { type: Array, default: () => [] },
     filterSchemes: { type: Array, default: () => [] },
     currentFilterValues: { type: Object, default: () => ({}) },
-    pageSizes: { type: Array, default: () => [10, 20, 50, 100] },
-    defaultPageSize: { type: Number, default: 0 },
+    pageSizes: { type: Array, default: () => [10, 50, 100, 500] },
     showSummary: { type: Boolean, default: false },
     showUniversalFilter: { type: Boolean, default: true }
   },
@@ -268,7 +256,6 @@ export default {
       editingSchemeIndex: -1,
       editingSchemeName: '',
       editPageSizes: [],
-      editDefaultPageSize: 0,
       editShowSummary: false,
       editShowUniversalFilter: true,
       customPageSizeInput: 50,
@@ -354,7 +341,7 @@ export default {
         let frozenPosition = ''
         if (isSpecial) {
           if (this.frozenFields.includes(key)) {
-            frozenPosition = key === '__actions' ? (this.frozenPositions[key] || 'right') : 'left'
+            frozenPosition = meta.fieldType === 'actions' ? (this.frozenPositions[key] || 'right') : 'left'
           } else if (meta.frozenPosition) {
             frozenPosition = meta.frozenPosition
           }
@@ -394,8 +381,7 @@ export default {
         filterValues: JSON.parse(JSON.stringify(s.filterValues || {}))
       }))
 
-      this.editPageSizes = [...(this.pageSizes || [10, 20, 50, 100])].sort((a, b) => a - b)
-      this.editDefaultPageSize = this.defaultPageSize || 0
+      this.editPageSizes = [...(this.pageSizes || [10, 50, 100, 500])].sort((a, b) => a - b)
       this.editShowSummary = this.showSummary
       this.editShowUniversalFilter = this.showUniversalFilter
 
@@ -589,7 +575,6 @@ export default {
         filterFields,
         filterSchemes,
         pageSizes: [...this.editPageSizes].sort((a, b) => a - b),
-        defaultPageSize: this.editDefaultPageSize || 0,
         showSummary: this.editShowSummary,
         showUniversalFilter: this.editShowUniversalFilter
       })
@@ -853,12 +838,6 @@ export default {
   font-size: 12px;
 }
 .pagination-config-custom {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.pagination-config-default-size {
   display: flex;
   align-items: center;
   gap: 8px;

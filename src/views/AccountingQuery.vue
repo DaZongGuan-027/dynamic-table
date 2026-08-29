@@ -4,6 +4,8 @@
 
     :field-meta-list="fieldMetaList"
     :fetch-data-fn="fetchDataFn"
+    :export-data-fn="exportDataFn"
+    export-file-name="核算数据"
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
     :default-visible-fields="defaultVisibleFields"
@@ -15,16 +17,12 @@
     @selection-change="handleSelectionChange"
     @row-action="handleRowAction"
   >
-    <template #toolbar-left>
-      <el-button type="primary" icon="el-icon-download" size="small">导出</el-button>
-    </template>
-
   </dynamic-table>
 </template>
 
 <script>
 import DynamicTable from '../../packages/dynamic-table/src/index.vue'
-import { getAccountingData, getTableConfig, saveTableConfig } from '../mock/api'
+import { getAccountingData, exportAccountingData, getTableConfig, saveTableConfig } from '../mock/api'
 
 export default {
   name: 'AccountingQuery',
@@ -91,6 +89,7 @@ export default {
           fieldLabel: '科目名称',
           fieldType: 'string',
           filterable: true,
+          filterMultiple: false,
           sortable: true,
           width: 120,
           align: 'left',
@@ -231,6 +230,10 @@ export default {
   methods: {
     fetchDataFn(params) {
       return getAccountingData(params)
+    },
+
+    exportDataFn(params) {
+      return exportAccountingData(params)
     },
 
     loadConfigFn(menuId) {

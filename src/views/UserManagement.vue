@@ -49,7 +49,7 @@ export default {
         { fieldKey: '__index', fieldLabel: '序号', fieldType: 'index', width: 50 },
         { fieldKey: 'username', fieldLabel: '用户名', fieldType: 'string', filterable: true, sortable: true, width: 120, align: 'left' },
         { fieldKey: 'age', fieldLabel: '年龄', fieldType: 'number', filterable: true, sortable: true, width: 80, align: 'center' },
-        { fieldKey: 'status', fieldLabel: '状态', fieldType: 'enum', filterable: true, sortable: true, width: 100, align: 'center', enumValues: [{ label: '启用', value: 1 }, { label: '禁用', value: 0 }] },
+        { fieldKey: 'status', fieldLabel: '状态', fieldType: 'enum', filterable: true, sortable: true, filterMultiple: false, width: 100, align: 'center', enumValues: [{ label: '启用', value: 1 }, { label: '禁用', value: 0 }] },
         { fieldKey: 'birthday', fieldLabel: '生日', fieldType: 'date', filterable: true, sortable: true, width: 120, align: 'center' },
         { fieldKey: 'email', fieldLabel: '邮箱', fieldType: 'string', filterable: true, sortable: false, width: 200, align: 'left' },
         { fieldKey: 'role', fieldLabel: '角色', fieldType: 'enum', filterable: true, sortable: true, width: 120, align: 'center', enumValues: [{ label: '管理员', value: 'admin' }, { label: '普通用户', value: 'user' }] },

@@ -52,6 +52,8 @@ export default {
     menu-id="M001"
     :field-meta-list="fieldMetaList"
     :fetch-data-fn="fetchDataFn"
+    :export-data-fn="exportDataFn"
+    export-file-name="用户数据"
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
     row-key="id"
@@ -71,7 +73,7 @@ export default {
 </template>
 
 <script>
-import { fetchUserList, getTableConfig, saveTableConfig } from '@/api/table'
+import { fetchUserList, exportUserList, getTableConfig, saveTableConfig } from '@/api/table'
 
 export default {
   data() {
@@ -81,7 +83,7 @@ export default {
         { fieldKey: '__index', fieldLabel: '序号', fieldType: 'index', width: 50 },
         { fieldKey: 'username', fieldLabel: '用户名', fieldType: 'string', filterable: true, sortable: true, width: 120, align: 'left' },
         { fieldKey: 'age', fieldLabel: '年龄', fieldType: 'number', filterable: true, sortable: true, width: 80, align: 'center' },
-        { fieldKey: 'status', fieldLabel: '状态', fieldType: 'enum', filterable: true, sortable: true, width: 100, align: 'center',
+        { fieldKey: 'status', fieldLabel: '状态', fieldType: 'enum', filterable: true, sortable: true, filterMultiple: false, width: 100, align: 'center',
           enumValues: [{ label: '启用', value: 1 }, { label: '禁用', value: 0 }]
         },
         { fieldKey: 'birthday', fieldLabel: '生日', fieldType: 'date', filterable: true, sortable: true, width: 120, align: 'center' },
@@ -101,6 +103,9 @@ export default {
   methods: {
     fetchDataFn(params) {
       return fetchUserList(params)
+    },
+    exportDataFn(params) {
+      return exportUserList(params)
     },
     loadConfigFn(menuId) {
       return getTableConfig(menuId)
@@ -130,15 +135,22 @@ export default {
 | menuId | String | 是 | - | 菜单ID，用于配置隔离 |
 | fieldMetaList | Array | 是 | - | 字段元数据列表，定义表格列（含选择框、序号、操作列等特殊列） |
 | fetchDataFn | Function | 是 | - | 数据查询函数，接收 params 参数，返回 Promise `{ list, total }` |
+| dataResponseAdapter | Function | 否 | null | 自定义列表响应转换函数，将接口响应转换为 `{ list, total }` |
+| exportDataFn | Function | 否 | null | 后端导出函数；接收当前字段、筛选和排序配置，返回 `Blob`、`{ blob, fileName }`、Axios Blob 响应或 `{ downloadUrl, fileName }` |
+| dataErrorHandler | Function | 否 | null | 分页查询失败后的统一错误处理函数 |
+| exportFileName | String | 否 | '表格数据' | 导出接口未返回文件名时使用的默认文件名 |
 | loadConfigFn | Function | 否 | null | 加载配置函数，接收 menuId，返回 Promise 配置对象 |
 | saveConfigFn | Function | 否 | null | 保存配置函数，接收 config 对象，返回 Promise |
+| configResponseAdapter | Function | 否 | null | 自定义配置响应转换函数，将接口响应转换为配置对象或 `null` |
+| configErrorHandler | Function | 否 | null | 配置加载失败后的统一错误处理函数 |
 | rowKey | String | 否 | 'id' | 行数据唯一标识字段 |
+| reserveSelection | Boolean | 否 | false | 是否跨分页保留勾选；开启时必须保证 `rowKey` 全局唯一 |
 | border | Boolean | 否 | true | 是否显示边框 |
 | stripe | Boolean | 否 | true | 是否斑马纹 |
 | tableHeight | String/Number | 否 | undefined | 固定表格高度，不设置则自适应（flex 布局） |
 | maxHeight | String/Number | 否 | undefined | 表格最大高度，作为 `tableHeight` 或自适应高度的上限，超出后表格内部滚动 |
 | showPagination | Boolean | 否 | true | 是否显示分页 |
-| pageSizes | Array | 否 | [10,20,50,100] | 每页条数选项 |
+| pageSizes | Array | 否 | [10,50,100,500] | 每页条数选项；当前页面初始展示条数取其中最小值 |
 | pageSizeParamName | String | 否 | 'pageSize' | 分页大小参数名 |
 | pageParamName | String | 否 | 'page' | 页码参数名 |
 | headerAlign | String | 否 | 'center' | 表头对齐方式，默认居中 |
@@ -164,12 +176,18 @@ export default {
 | filterable | Boolean | 否 | 是否可筛选 |
 | sortable | Boolean | 否 | 是否可排序 |
 | width | Number | 否 | 列最小宽度（使用 min-width，自动扩展填满容器） |
-| minWidth | Number | 否 | - | 列最小宽度，仅在 `width` 未设置时生效（兜底值） |
-| formatter | Function | 否 | - | 单元格展示格式化函数 `(value) => string`，在类型格式化之后执行 |
+| minWidth | Number | 否 | 列最小宽度，仅在 `width` 未设置时生效（兜底值） |
+| formatter | Function | 否 | 单元格展示格式化函数 `(value) => string`，在类型格式化之后执行 |
+| exportable | Boolean | 否 | 是否允许导出，默认为 `true` |
+| exportFieldKey | String | 否 | 后端导出使用的字段标识；未配置时与 `fieldKey` 相同 |
+| exportFieldLabel | String | 否 | 导出列名；未配置时使用 `fieldLabel` |
+| exportFormat | String | 否 | 传给后端的导出格式标识，例如日期或金额格式 |
 | align | String | 否 | 对齐方式：`left` / `center` / `right` |
 | enumValues | Array/Object | 否 | 枚举值，支持数组 `[{ label, value }]` 或 Map `{ '001': '技术部' }` |
+| filterMultiple | Boolean | 否 | 枚举下拉是否允许多选，默认 `true`；设为 `false` 时筛选面板、表头筛选和万能筛选均为单选 |
 | frozenPosition | String | 否 | 冻结位置：`'left'` / `'right'`，不设置则不冻结 |
 | dateFilterType | String | 否 | 日期筛选类型：`daterange`（默认）/ `monthrange` / `month` / `date` |
+| monthToDateRange | Boolean | 否 | 默认 `false`；当 `dateFilterType: 'month'` 时，设为 `true` 会将所选月份转换为当月月初至月末的 `{ range }` |
 | dateFormat | String | 否 | 日期展示格式：`yyyy-MM-dd`（默认）/ `yyyy-MM` / `yyyy-MM-dd HH:mm:ss` |
 
 #### 特殊列
@@ -214,7 +232,7 @@ export default {
 | string | 文本，筛选时为操作符下拉+输入框，默认"包含" |
 | number | 数值，筛选时为操作符下拉+输入框，默认"等于" |
 | currency | 金额，自动千分位格式化并保留两位小数，筛选同 number |
-| enum | 枚举，筛选时为过滤输入框+多选下拉（含全选），下拉框不支持输入，仅通过过滤框筛选选项，列展示自动显示 label；若未配置 `enumValues` 或选项为空，筛选/表头搜索自动退化为字符串输入框 |
+| enum | 枚举，筛选时为过滤输入框+下拉选择；默认多选（含全选），配置 `filterMultiple: false` 后为单选。下拉框不支持输入，仅通过过滤框筛选选项，列展示自动显示 label；若未配置 `enumValues` 或选项为空，筛选/表头搜索自动退化为字符串输入框 |
 | date | 日期，筛选类型由 `dateFilterType` 控制，展示格式由 `dateFormat` 控制 |
 | boolean | 布尔，筛选时为是/否下拉 |
 
@@ -232,6 +250,18 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 
 非 enum 类型字段配置了 enumValues 后，筛选面板和表头搜索也会自动使用下拉选择，列展示会自动做编码→名称映射。
 
+### 日期筛选格式
+
+| dateFilterType | 控件 | 请求值 |
+|----------------|------|--------|
+| `daterange` | 开始日期、结束日期 | `{ range: ['2024-01-01', '2024-01-31'] }` |
+| `monthrange` | 开始月份、结束月份 | `{ range: ['2024-01-01', '2024-03-31'] }` |
+| `month` | 单个月份 | 默认 `{ value: '2024-02' }` |
+| `month` + `monthToDateRange: true` | 单个月份 | `{ range: ['2024-02-01', '2024-02-29'] }` |
+| `date` | 单个日期 | `{ value: '2024-02-15' }` |
+
+筛选面板、表头筛选、万能筛选和筛选缓存使用相同结构。字段筛选类型发生变化时，组件会按当前结构校验缓存；不兼容的字段缓存会自动忽略。
+
 ### 操作列
 
 - 通过 `fieldMetaList` 中 `fieldType: 'actions'` 的项配置操作按钮
@@ -246,6 +276,12 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | selection-change | selection | 选中行变化时触发 |
 | row-action | { action, row } | 操作列按钮点击时触发，action 为 rowActions 中配置的标识 |
 | config-saved | config | 配置保存时触发，仅在未提供 `saveConfigFn` 时触发（无后端模式），config 为完整配置对象 |
+| config-error | error | 配置加载失败时触发；组件会使用默认展示，但阻止保存以免覆盖服务端配置 |
+| config-save-error | error | 配置保存失败时触发 |
+| config-save-blocked | error | 配置加载失败后尝试保存时触发 |
+| export-success | result | 导出文件成功后触发 |
+| export-error | error | 导出失败后触发 |
+| data-error | error | 分页查询失败后触发 |
 
 ### Slots
 
@@ -254,6 +290,13 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | toolbar-left | - | 工具栏左侧按钮区域 |
 | column-{fieldKey} | { row, value } | 自定义列内容渲染 |
 | actions | { row } | 自定义操作列内容，覆盖默认的操作按钮渲染 |
+| loading | - | 自定义数据加载状态 |
+| empty | - | 自定义空数据状态 |
+| error | { error, retry } | 自定义加载失败状态，`retry` 可重新请求 |
+
+### 实例方法
+
+通过表格组件 `ref` 可调用：`refresh()`、`retry()`、`resetFilters()`、`getFilters()`、`getExportFields()`、`getTableConfig()`、`getSelection()`、`clearSelection()`、`toggleRowSelection(row, selected)`、`doLayout()` 和 `getElTable()`。
 
 ### fetchDataFn 参数格式
 
@@ -263,14 +306,36 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
   pageSize: 10,
   filters: {          // 筛选面板 + 表头搜索的合并条件
     username: { operator: 'contains', value: '张' },  // 字符串：操作符+值
-    status: [1],                                        // 枚举：多选值数组
+    status: 1,                                          // 单选枚举：标量（多选枚举仍为数组）
     age: { operator: 'eq', value: 25 },                 // 数值：操作符+值
     salary: { operator: 'gte', value: 5000 },           // 金额：操作符+值
-    birthday: { start: '2024-01-01 00:00:00', end: '2024-12-31 23:59:59' },  // 日期：自动拼接时间
+    birthday: { range: ['2024-01-01', '2024-12-31'] },      // 日期范围
+    periodDate: { range: ['2024-02-01', '2024-02-29'] }, // 单月转日期范围
     isActive: true                                       // 布尔：直接传值
   },
   sortBy: 'createTime',
   sortOrder: 'descending'
+}
+```
+
+`fetchDataFn` 的第二个参数为请求上下文，可将 `signal` 交给 Axios 或 Fetch，以便组件在翻页、快速筛选、切换菜单和销毁时取消旧请求：
+
+```js
+fetchDataFn(params, { signal }) {
+  return axios.post('/api/table/data', params, { signal })
+}
+```
+
+单个月份转换为日期范围：
+
+```js
+{
+  fieldKey: 'periodDate',
+  fieldLabel: '所属月份',
+  fieldType: 'date',
+  dateFilterType: 'month',
+  monthToDateRange: true,
+  filterable: true
 }
 ```
 
@@ -301,10 +366,64 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 }
 ```
 
+组件默认兼容直接返回、Axios `{ data }` 包装以及常见的 `{ code, data }` 包装。如接口字段不是 `list`、`total`，可使用：
+
+```vue
+<dynamic-table :data-response-adapter="res => ({ list: res.data.records, total: res.data.count })" />
+```
+
+### 后端导出
+
+传入 `exportDataFn` 后，“表格配置”左侧会显示纯下载图标。组件只提交点击时的当前可见数据字段、字段顺序、筛选条件和排序条件，不提交 `page`、`pageSize`：
+
+点击下载图标后会提示“将根据表头配置进行导出，是否确认？”。确认后才调用 `exportDataFn`，取消或关闭弹窗不会发起导出请求。
+
+```js
+exportDataFn({ menuId, fields, filters, sortBy, sortOrder }) {
+  return axios.post('/api/table/export', {
+    menuId,
+    fields,
+    filters,
+    sortBy,
+    sortOrder
+  }, { responseType: 'blob' })
+}
+```
+
+`exportDataFn` 收到的参数示例：
+
+```js
+{
+  menuId: 'M001',
+  fields: [
+    { fieldKey: 'username', exportFieldKey: 'user_name', fieldLabel: '用户名', fieldType: 'string', exportFormat: '' },
+    { fieldKey: 'status', fieldLabel: '状态', fieldType: 'enum' }
+  ],
+  filters: {
+    status: 1,
+    createTime: { range: ['2024-01-01', '2024-12-31'] }
+  },
+  sortBy: 'createTime',
+  sortOrder: 'descending'
+}
+```
+
+说明：
+
+- `fields` 按当前表格展示顺序传递。
+- 隐藏字段以及选择框、序号、操作列不会导出。
+- `exportable: false` 的字段不会导出；后端优先使用 `exportFieldKey` 识别导出字段。
+- 展示格式函数不能序列化给后端；服务端应根据 `exportFieldKey`、`fieldType` 和 `exportFormat` 完成格式化。
+- 导出条件包含筛选面板、表头搜索和万能筛选的合并结果。
+- 服务端负责查询全部匹配数据并生成文件；组件不会循环查询分页接口。
+- 支持直接返回 `Blob`、`{ blob, fileName }`、Axios Blob 响应或 `{ downloadUrl, fileName }`。
+- Axios 模式必须配置 `responseType: 'blob'`。
+
 ### loadConfigFn 返回格式
 
 ```js
 {
+  version: 2,
   menuId: 'M001',
 
   visibleFields: '["username","age","status"]',       // JSON 字符串
@@ -313,9 +432,14 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
   columnWidths: '{"username":120,"age":80}',           // 列宽配置
   filterFields: '["username","status"]',
   columnOrder: '["username","age","status"]',
-  filterSchemes: '[{"name":"方案1","filterValues":{}}]'
+  filterSchemes: '[{"name":"方案1","filterValues":{}}]',
+  settings: '{"pageSizes":[10,50,100,500],"showSummary":true,"showUniversalFilter":true}'
 }
 ```
+
+`version: 2` 将分页选项和功能开关独立存入 `settings`。组件仍兼容旧配置中保存在 `columnWidths` 的 `__pageSizes`、`__showSummary`、`__showUniversalFilter`，读取后自动迁移，后续保存即写为 version 2。
+
+配置接口同样兼容直接对象、Axios 和 `{ code, data }` 包装。若接口结构不同，可通过 `configResponseAdapter` 转换。配置加载异常会触发 `config-error`，且在重新加载成功前阻止保存；连续保存会按顺序执行，避免旧请求晚返回覆盖新配置。
 
 ### saveConfigFn 接收格式
 
@@ -353,10 +477,10 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 - 勾选需要作为筛选项的字段，拖拽调整顺序
 - 筛选面板根据字段类型自动生成对应控件
 - 字符串/数值/金额类型：操作符下拉 + 值输入框
-- 枚举类型：过滤输入框 + 多选下拉（含全选，选项 > 1 时显示），下拉框不支持输入，仅通过左边过滤框筛选选项
+- 枚举类型：过滤输入框 + 下拉选择；默认多选（含全选，选项 > 1 时显示），`filterMultiple: false` 时单选
 - 日期类型：由 `dateFilterType` 控制筛选格式（`daterange`/`monthrange`/`month`/`date`）
 - 布尔类型：是/否下拉
-- 日期筛选值自动拼接时间：开始日期拼接 `00:00:00`，结束日期拼接 `23:59:59`
+- 日期、月份区间和开启 `monthToDateRange` 的单月筛选统一使用 `{ range: [开始日期, 结束日期] }`
 - 筛选区域超过3行自动出现滚动条
 - 筛选条件默认缓存到浏览器 localStorage，可通过 `cacheFilters` 属性控制
 - 重置按钮同时清除筛选面板条件、表头搜索条件、排序和浏览器缓存
@@ -383,21 +507,35 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 - 不传该属性时保持原行为：默认不展示任何筛选项。
 
 ### 万能筛选
-- 筛选面板底部提供万能筛选区域，可动态选择任意字段进行筛选
+- 筛选面板底部左侧提供带“万能筛选”标题的万能筛选区域，可动态选择任意字段进行筛选
+- “常用方案”位于“保存筛选”按钮左侧，与查询、重置操作集中显示在右侧
 - 选择字段后自动根据字段类型渲染对应筛选控件
 - 可通过 `showUniversalFilter` 属性或在配置抽屉中控制显隐
 
 ### 合计行
 - 设置 `showSummary` 属性开启合计行
-- 合计行显示在表格首行，对 `currency`/`number` 类型列自动求和
+- 当前页数据由组件求和，名称显示为“当前页合计”
 - 合计标签显示在第一个非金额/数字类型的可见数据列
 - 可在配置抽屉的"参数配置" tab 中开关合计行
+
+### 动态属性与缓存兼容
+
+- `menuId` 变化时自动重新加载对应配置、筛选缓存和分页数据。
+- `fieldMetaList` 变化时自动删除失效字段配置并追加新字段，随后重新布局和查询。
+- 未保存用户配置时，`defaultVisibleFields`、`defaultFilterFields` 和 `pageSizes` 的变化会即时生效。
+- 字段筛选类型与旧缓存结构不匹配时，该字段旧缓存会被忽略，无需用户手动清除。
 
 ### 筛选方案
 - 最多保存5个常用筛选方案
 - 支持修改方案名称（点击名称或编辑图标）
 - 使用方案后修改筛选值，保存时提示覆盖或新建
 - 重置按钮同时清除筛选面板条件、表头搜索条件和排序
+
+### 跨页选择
+
+- 设置 `reserveSelection` 后，组件除使用 Element UI 的保留选择外，还会按 `rowKey` 独立保存选中数据。
+- 翻页或表格配置导致表格重建时会自动恢复当前页勾选，`getSelection()` 返回全部已保留行。
+- `rowKey` 必须在整个数据集内唯一；调用 `clearSelection()` 可清除全部跨页选择。
 
 ### 还原默认配置
 - 配置抽屉底部提供"还原默认"按钮
@@ -410,7 +548,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 - 点击表头名称弹出下拉菜单，支持排序和搜索
 - 排序三态切换：升序 → 降序 → 无
 - 字符串/数值/金额类型搜索支持操作符选择
-- 枚举类型搜索：过滤输入框 + 多选下拉 + 搜索确认按钮，下拉框不支持输入，仅通过过滤框筛选选项
+- 枚举类型搜索：过滤输入框 + 下拉选择 + 搜索确认按钮；默认多选，`filterMultiple: false` 时单选
 - 日期类型搜索由 `dateFilterType` 控制选择器格式
 - 表头搜索条件与筛选面板条件合并后一起传给 fetchDataFn
 
@@ -426,8 +564,8 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 
 ### 分页
 - 固定在表格底部，不随数据高度变化
-- 可在配置抽屉的"参数配置" tab 中自定义分页条数选项和默认展示条数
-- 支持预设条数快选（10/20/50/100/200/500/1000/2000），也可手动输入自定义条数
+- 可在配置抽屉的“参数配置” tab 中自定义分页条数选项，当前页面初始展示条数始终取已选选项中的最小值
+- 默认已选条数为 10/50/100/500；支持预设条数快选（10/20/50/100/200/500/1000/2000），也可手动输入自定义条数
 
 ## 后端接口设计
 
@@ -439,6 +577,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 
 ```json
 {
+  "version": 2,
   "menuId": "M001",
 
   "visibleFields": "[\"username\",\"age\",\"status\"]",
@@ -447,7 +586,8 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
   "columnWidths": "{\"username\":120,\"age\":80}",
   "filterFields": "[\"username\",\"status\"]",
   "columnOrder": "[\"username\",\"age\",\"status\"]",
-  "filterSchemes": "[{\"name\":\"方案1\",\"filterValues\":{\"username\":{\"operator\":\"contains\",\"value\":\"张\"}}}]"
+  "filterSchemes": "[{\"name\":\"方案1\",\"filterValues\":{\"username\":{\"operator\":\"contains\",\"value\":\"张\"}}}]",
+  "settings": "{\"pageSizes\":[10,50,100,500],\"showSummary\":true,\"showUniversalFilter\":true}"
 }
 ```
 
@@ -476,6 +616,7 @@ CREATE TABLE t_table_config (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   menu_id VARCHAR(64) NOT NULL COMMENT '菜单ID',
   user_id VARCHAR(64) NOT NULL COMMENT '用户ID，后端从登录态获取',
+  config_version INT NOT NULL DEFAULT 2 COMMENT '配置结构版本',
   visible_fields TEXT COMMENT '可见字段JSON',
   frozen_fields TEXT COMMENT '冻结字段JSON',
   frozen_positions TEXT COMMENT '冻结位置JSON',
@@ -483,6 +624,7 @@ CREATE TABLE t_table_config (
   filter_fields TEXT COMMENT '筛选字段JSON',
   column_order TEXT COMMENT '列顺序JSON',
   filter_schemes TEXT COMMENT '筛选方案JSON',
+  settings TEXT COMMENT '分页选项及功能开关JSON',
   created_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_menu_user (menu_id, user_id)
@@ -500,6 +642,7 @@ CREATE TABLE t_table_config (
   "code": 200,
   "message": "success",
   "data": {
+    "version": 2,
     "menuId": "M001",
     "visibleFields": "[\"username\",\"age\",\"status\"]",
     "frozenFields": "[\"username\"]",
@@ -507,7 +650,8 @@ CREATE TABLE t_table_config (
     "columnWidths": "{\"username\":120,\"age\":80}",
     "filterFields": "[\"username\",\"status\"]",
     "columnOrder": "[\"username\",\"age\",\"status\"]",
-    "filterSchemes": "[{\"name\":\"方案1\",\"filterValues\":{}}]"
+    "filterSchemes": "[{\"name\":\"方案1\",\"filterValues\":{}}]",
+    "settings": "{\"pageSizes\":[10,50,100,500],\"showSummary\":true,\"showUniversalFilter\":true}"
   }
 }
 ```
@@ -528,10 +672,10 @@ CREATE TABLE t_table_config (
   "pageSize": 10,
   "filters": {
     "username": { "operator": "contains", "value": "张" },
-    "status": [1, 2],
+    "status": 1,
     "age": { "operator": "gte", "value": 20 },
     "salary": { "operator": "lte", "value": 50000 },
-    "birthday": { "start": "2024-01-01 00:00:00", "end": "2024-12-31 23:59:59" },
+    "birthday": { "range": ["2024-01-01", "2024-12-31"] },
     "isActive": true
   },
   "sortBy": "createTime",
@@ -560,14 +704,15 @@ CREATE TABLE t_table_config (
 |----------|-------------|-------------|
 | string | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `contains` → `LIKE %val%`, `notContains` → `NOT LIKE %val%`, `startsWith` → `LIKE val%`, `endsWith` → `LIKE %val`, `in` → `IN (val1, val2, ...)` |
 | number/currency | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `gt` → `>`, `lt` → `<`, `gte` → `>=`, `lte` → `<=` |
-| enum | `[value1, value2]` | `IN (value1, value2)` |
-| date | `{ start, end }` | `start` 已拼接 `00:00:00`，`end` 已拼接 `23:59:59`，直接用 `BETWEEN start AND end` |
+| enum（单选） | `value` | `= value` |
+| enum（多选） | `[value1, value2]` | `IN (value1, value2)` |
+| date | `{ range: [start, end] }` | 使用 `range[0]`、`range[1]` 进行 `BETWEEN` 查询 |
 | boolean | `true/false` | `= true` 或 `= false` |
 
 **设计要点**：
 - `filters` 中的 key 为 `fieldKey`，后端需映射为实际数据库字段名
-- 日期筛选值前端已自动拼接时间后缀，后端可直接用于范围查询
-- 枚举类型值为数组，后端使用 `IN` 查询
+- 日期筛选统一使用 `{ range }`，单月模式会自动转换为当月 1 日和月末日期
+- 枚举单选值为标量，使用等值查询；多选值为数组，使用 `IN` 查询
 - 排序字段 `sortBy` 需映射为数据库字段名，`sortOrder` 为 `ascending` / `descending`
 - 建议对 `filters` 中的值做 SQL 注入防护（参数化查询）
 
@@ -623,7 +768,7 @@ public static <T> void buildFilters(QueryWrapper<T> wrapper, Map<String, Object>
         String column = getColumnName(field); // 获取 @TableField 注解的列名，无注解则驼峰转下划线
 
         if (value instanceof Map) {
-            // 操作符筛选：{ operator, value } 或 { start, end }
+            // 操作符筛选：{ operator, value } 或 { range: [start, end] }
             Map<String, Object> filterMap = (Map<String, Object>) value;
             if (filterMap.containsKey("operator")) {
                 String operatorCode = (String) filterMap.get("operator");
@@ -631,9 +776,12 @@ public static <T> void buildFilters(QueryWrapper<T> wrapper, Map<String, Object>
                 FilterOperator op = FilterOperator.fromCode(operatorCode);
                 if (op == null) continue;
                 applyOperator(wrapper, column, op, filterValue, fieldType);
-            } else if (filterMap.containsKey("start") && filterMap.containsKey("end")) {
+            } else if (filterMap.containsKey("range")) {
                 // 日期范围
-                wrapper.between(column, filterMap.get("start"), filterMap.get("end"));
+                List<?> range = (List<?>) filterMap.get("range");
+                if (range.size() == 2) {
+                    wrapper.between(column, range.get(0), range.get(1));
+                }
             }
         } else if (value instanceof List) {
             // 枚举多选
@@ -642,6 +790,9 @@ public static <T> void buildFilters(QueryWrapper<T> wrapper, Map<String, Object>
                 wrapper.in(column, values);
             }
         } else if (value instanceof Boolean) {
+            wrapper.eq(column, value);
+        } else if (value instanceof String || value instanceof Number) {
+            // 枚举单选等标量筛选
             wrapper.eq(column, value);
         }
     }
@@ -662,8 +813,8 @@ private static void applyOperator(QueryWrapper<?> wrapper, String column, Filter
         case STARTS_WITH: wrapper.likeRight(column, strVal); break;
         case ENDS_WITH: wrapper.likeLeft(column, strVal); break;
         case IN:
-            if (filterValue instanceof List) {
-                wrapper.in(column, (List<?>) filterValue);
+            if (value instanceof List) {
+                wrapper.in(column, (List<?>) value);
             }
             break;
         case GT:       wrapper.gt(column, strVal); break;
@@ -697,3 +848,60 @@ public Result<PageResult<UserVO>> listUsers(@RequestBody PageRequest params) {
 - 通过反射自动识别字段类型，无需每个页面手写 if-else
 - 公共方法 `buildFilters` 可在所有列表接口复用，新增页面零代码
 - `@TableField` 注解自动映射 fieldKey → 数据库列名，支持驼峰转下划线
+
+### 4. 全量导出接口
+
+**请求方式**：`POST /api/table/export`
+
+导出接口不接收分页参数。后端必须对 `fields` 和排序字段进行白名单校验，并使用当前筛选条件查询全部匹配数据。
+
+**请求参数**：
+
+```json
+{
+  "menuId": "M001",
+  "fields": [
+    { "fieldKey": "username", "fieldLabel": "用户名", "fieldType": "string" },
+    { "fieldKey": "status", "fieldLabel": "状态", "fieldType": "enum" },
+    { "fieldKey": "createTime", "fieldLabel": "创建时间", "fieldType": "date" }
+  ],
+  "filters": {
+    "status": 1,
+    "createTime": { "range": ["2024-01-01", "2024-12-31"] }
+  },
+  "sortBy": "createTime",
+  "sortOrder": "descending"
+}
+```
+
+**同步文件响应**：
+
+```http
+Content-Type: text/csv; charset=utf-8
+Content-Disposition: attachment; filename*=UTF-8''users.csv
+```
+
+前端应使用 `responseType: 'blob'`。组件会优先读取 `Content-Disposition` 文件名；读取不到时使用 `exportFileName`。
+
+后端也可以返回已生成文件的地址：
+
+```json
+{
+  "downloadUrl": "/api/table/export/download/abc123",
+  "fileName": "用户数据.xlsx"
+}
+```
+
+大数据量场景建议使用流式 CSV 或异步导出任务，避免在前端循环请求分页数据，也避免在服务端一次性将全部数据保存在内存中。
+
+## 开发与发布检查
+
+组件包包含 `types/index.d.ts`，TypeScript 项目可直接获得字段元数据、查询参数、导出参数及实例方法类型。
+
+```bash
+npm test              # 运行纯函数单元测试
+npm run check         # 单元测试 + 组件库构建
+npm run build         # 示例应用生产构建
+```
+
+执行 `npm publish` 前会自动运行测试和生产模式组件库构建。

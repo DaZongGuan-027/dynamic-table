@@ -14,12 +14,14 @@ export default {
     {
       file: 'lib/dynamic-table.esm.js',
       format: 'esm',
+      exports: 'named',
       sourcemap: false
     },
     {
       file: 'lib/dynamic-table.umd.js',
       format: 'umd',
       name: 'DynamicTable',
+      exports: 'named',
       sourcemap: false,
       globals: {
         vue: 'Vue',

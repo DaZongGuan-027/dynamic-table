@@ -1,5 +1,18 @@
 const STORAGE_PREFIX = 'dynamic_table_config_'
 
+function toTimestamp(value) {
+  if (value === null || value === undefined || value === '') return NaN
+  const text = String(value)
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? text + 'T00:00:00'
+    : text.replace(' ', 'T')
+  return Date.parse(normalized)
+}
+
+function toCellText(value) {
+  return value === null || value === undefined ? '' : String(value)
+}
+
 const mockTableData = [
   { id: 1, username: '张三', age: 28, status: 1, birthday: '1996-05-12', email: 'zhangsan@test.com', role: 'admin', createTime: '2024-01-15 10:30:00', department: '技术部', phone: '13800001111' },
   { id: 2, username: '李四', age: 34, status: 1, birthday: '1990-08-22', email: 'lisi@test.com', role: 'user', createTime: '2024-02-20 14:15:00', department: '市场部', phone: '13800002222' },
@@ -72,6 +85,32 @@ export function getAccountingData(params = {}) {
   return _queryData(mockAccountingData, params)
 }
 
+// 模拟后端导出接口：生产环境应由服务端查询全量数据并返回文件。
+export function exportAccountingData(params = {}) {
+  return _queryData(mockAccountingData, {
+    filters: params.filters,
+    sortBy: params.sortBy,
+    sortOrder: params.sortOrder,
+    page: 1,
+    pageSize: mockAccountingData.length
+  }).then(result => {
+    const fields = params.fields || []
+    const escapeCsvValue = value => {
+      let text = value === null || value === undefined ? '' : String(value)
+      if (/^[=+\-@]/.test(text)) text = "'" + text
+      return '"' + text.replace(/"/g, '""') + '"'
+    }
+    const rows = [
+      fields.map(field => escapeCsvValue(field.fieldLabel)).join(','),
+      ...result.list.map(row => fields.map(field => escapeCsvValue(row[field.fieldKey])).join(','))
+    ]
+    return {
+      blob: new Blob(['\ufeff' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' }),
+      fileName: '核算数据.csv'
+    }
+  })
+}
+
 function _queryData(dataSource, params = {}) {
   return new Promise(resolve => {
     setTimeout(() => {
@@ -94,13 +133,13 @@ function _queryData(dataSource, params = {}) {
                 case 'neq':
                   filtered = filtered.filter(row => String(row[fieldKey]) !== String(fv)); break
                 case 'contains':
-                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().includes(String(fv).toLowerCase())); break
+                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase())); break
                 case 'notContains':
-                  filtered = filtered.filter(row => !String(row[fieldKey] || '').toLowerCase().includes(String(fv).toLowerCase())); break
+                  filtered = filtered.filter(row => !toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase())); break
                 case 'startsWith':
-                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().startsWith(String(fv).toLowerCase())); break
+                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().startsWith(String(fv).toLowerCase())); break
                 case 'endsWith':
-                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().endsWith(String(fv).toLowerCase())); break
+                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().endsWith(String(fv).toLowerCase())); break
                 case 'gt':
                   filtered = filtered.filter(row => Number(row[fieldKey]) > Number(fv)); break
                 case 'lt':
@@ -111,16 +150,21 @@ function _queryData(dataSource, params = {}) {
                   filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(fv)); break
 
                 default:
-                  filtered = filtered.filter(row => String(row[fieldKey] || '').toLowerCase().includes(String(fv).toLowerCase()))
+                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase()))
               }
             } else if (val.min !== null && val.min !== undefined && val.min !== '') {
               filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(val.min))
             } else if (val.max !== null && val.max !== undefined && val.max !== '') {
               filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(val.max))
-            } else if (val.start) {
-              filtered = filtered.filter(row => row[fieldKey] >= val.start)
-            } else if (val.end) {
-              filtered = filtered.filter(row => row[fieldKey] <= val.end + ' 23:59:59')
+            } else if (val.start || val.end) {
+              const startTime = val.start ? toTimestamp(val.start) : -Infinity
+              const endTime = val.end ? toTimestamp(val.end) : Infinity
+              filtered = filtered.filter(row => {
+                const rowTime = toTimestamp(row[fieldKey])
+                return !isNaN(rowTime) && rowTime >= startTime && rowTime <= endTime
+              })
+            } else if (val.value !== '' && val.value !== null && val.value !== undefined) {
+              filtered = filtered.filter(row => toCellText(row[fieldKey]).startsWith(String(val.value)))
             }
           } else if (Array.isArray(val)) {
             if (val.length > 0) {
@@ -128,7 +172,7 @@ function _queryData(dataSource, params = {}) {
             }
           } else {
             filtered = filtered.filter(row => {
-              const cellVal = String(row[fieldKey] || '')
+              const cellVal = toCellText(row[fieldKey])
               return cellVal.toLowerCase().includes(String(val).toLowerCase())
             })
           }

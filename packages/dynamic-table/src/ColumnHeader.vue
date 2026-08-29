@@ -46,14 +46,14 @@
               v-model="searchValue"
               size="mini"
               :placeholder="'选择' + fieldMeta.fieldLabel"
-              multiple
+              :multiple="enumMultiple"
               clearable
               class="enum-count-select"
               :popper-append-to-body="popperAppendToBody"
               style="width: 100%"
             >
             <el-option
-              v-if="filteredEnumOptions.length > 1"
+              v-if="enumMultiple && filteredEnumOptions.length > 1"
               label="全选"
               value="__all__"
               @click.native="handleEnumSelectAll($event)"
@@ -66,7 +66,7 @@
             />
             </el-select>
             <span
-              v-if="searchValue && searchValue.length"
+              v-if="enumMultiple && searchValue && searchValue.length"
               class="enum-selected-count"
             >已选{{ searchValue.length }}项</span>
           </div>
@@ -153,7 +153,7 @@
           />
           <el-date-picker
             v-else-if="dateFilterType === 'month'"
-            v-model="searchValue.value"
+            :value="singleMonthValue"
             type="month"
             size="mini"
             placeholder="选择月份"
@@ -161,6 +161,7 @@
             clearable
             :append-to-body="popperAppendToBody"
             style="width: 100%"
+            @input="handleSingleMonthInput"
           />
           <el-date-picker
             v-else-if="dateFilterType === 'date'"
@@ -208,7 +209,7 @@ export default {
   props: {
     fieldKey: { type: String, required: true },
     fieldMeta: { type: Object, required: true },
-    columnSearchValue: { type: [String, Object, Array], default: '' },
+    columnSearchValue: { type: [String, Number, Boolean, Object, Array], default: '' },
     currentSortOrder: { type: String, default: '' },
     popperAppendToBody: { type: Boolean, default: true }
   },
@@ -338,6 +339,18 @@ export default {
       return 'daterange'
     },
 
+    monthToDateRange() {
+      return this.fieldMeta && this.fieldMeta.monthToDateRange === true
+    },
+
+    singleMonthValue() {
+      if (this.monthToDateRange) {
+        const range = this.searchValue && this.searchValue.range
+        return Array.isArray(range) && range.length === 2 ? String(range[0]).slice(0, 7) : null
+      }
+      return this.searchValue && this.searchValue.value || null
+    },
+
     filteredEnumOptions() {
       const all = this.normalizedEnumValues
       const q = (this.enumFilterText || '').toLowerCase()
@@ -386,6 +399,10 @@ export default {
       return this._normalizeEnumValues(this.fieldMeta.enumValues)
     },
 
+    enumMultiple() {
+      return !this.fieldMeta || this.fieldMeta.filterMultiple !== false
+    },
+
     hasEnumOptions() {
       return this.normalizedEnumValues.length > 0
 
@@ -401,6 +418,20 @@ export default {
         return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
       }
       return []
+    },
+
+    buildSingleMonthRange(month) {
+      if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return null
+      const parts = String(month).split('-').map(Number)
+      const lastDay = new Date(parts[0], parts[1], 0).getDate()
+      const pad = n => n < 10 ? '0' + n : String(n)
+      return [month + '-01', month + '-' + pad(lastDay)]
+    },
+
+    handleSingleMonthInput(month) {
+      this.searchValue = this.monthToDateRange
+        ? { range: month ? this.buildSingleMonthRange(month) : null }
+        : { value: month || null }
     },
 
     handleEnumSelectAll(e) {
@@ -420,7 +451,15 @@ export default {
       const meta = this.fieldMeta
       const saved = this.columnSearchValue
       if (this.hasEnumOptions) {
-        this.searchValue = Array.isArray(saved) ? [...saved] : []
+        if (this.enumMultiple) {
+          this.searchValue = Array.isArray(saved)
+            ? [...saved]
+            : (saved !== '' && saved !== null && saved !== undefined ? [saved] : [])
+        } else {
+          this.searchValue = Array.isArray(saved)
+            ? (saved.length > 0 ? saved[0] : '')
+            : (saved !== null && saved !== undefined ? saved : '')
+        }
       } else if (meta.fieldType === 'string' || !meta.fieldType || (meta.fieldType === 'enum' && !this.hasEnumOptions)) {
         this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
           ? { operator: saved.operator || 'contains', value: saved.value != null ? saved.value : '' }
@@ -431,7 +470,7 @@ export default {
           : { operator: 'eq', value: '' }
       } else if (meta.fieldType === 'date') {
         const dft = this.dateFilterType
-        if (dft === 'daterange' || dft === 'monthrange') {
+        if (dft === 'daterange' || dft === 'monthrange' || (dft === 'month' && this.monthToDateRange)) {
           this.searchValue = (saved && typeof saved === 'object' && !Array.isArray(saved))
             ? { range: saved.range || null }
             : { range: null }

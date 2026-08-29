@@ -1,3 +1,5 @@
+import { buildDateRangeFilter, isCachedFilterValueValid } from '../utils/tableUtils.mjs'
+
 export default {
   props: {
     defaultFilterValues: { type: Object, default: () => ({}) },
@@ -23,12 +25,13 @@ export default {
         const val = this.filterValues[key]
         if (val === null || val === undefined || val === '') return
         if (typeof val === 'object' && !Array.isArray(val)) {
-          if (val.range !== undefined) {
+          const meta = this.fieldMetaMap[key]
+          const isSingleDate = meta && meta.fieldType === 'date' && (meta.dateFilterType === 'month' || meta.dateFilterType === 'date') && meta.monthToDateRange !== true
+          if (isSingleDate && val.value !== undefined) {
+            if (val.value !== '' && val.value !== null) filters[key] = { value: val.value }
+          } else if (val.range !== undefined) {
             if (Array.isArray(val.range) && val.range.length === 2) {
-              filters[key] = {
-                start: val.range[0] + ' 00:00:00',
-                end: val.range[1] + ' 23:59:59'
-              }
+              filters[key] = this._buildDateRangeFilter(meta, val.range)
             }
           } else if (val.operator !== undefined) {
             if (val.value !== '' && val.value !== null && val.value !== undefined) {
@@ -55,12 +58,16 @@ export default {
   },
 
   methods: {
+    _buildDateRangeFilter(meta, range) {
+      return buildDateRangeFilter(meta, range)
+    },
+
     initFilterValues(applyDefaults) {
       const values = {}
       this.activeFilterMetaList.forEach(meta => {
         const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
         if (hasEnum) {
-          values[meta.fieldKey] = []
+          values[meta.fieldKey] = meta.filterMultiple === false ? '' : []
         } else {
           switch (meta.fieldType) {
             case 'string':
@@ -72,7 +79,7 @@ export default {
               break
             case 'date':
               const dft = meta.dateFilterType || 'daterange'
-              if (dft === 'daterange' || dft === 'monthrange') {
+              if (dft === 'daterange' || dft === 'monthrange' || (dft === 'month' && meta.monthToDateRange === true)) {
                 values[meta.fieldKey] = { range: null }
               } else {
                 values[meta.fieldKey] = { value: null }
@@ -134,23 +141,7 @@ export default {
     },
 
     _isCachedValueValid(meta, cachedVal) {
-      if (!meta) return false
-      const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
-      if (hasEnum) return Array.isArray(cachedVal)
-      switch (meta.fieldType) {
-        case 'string':
-        case 'number':
-        case 'currency':
-          return !!cachedVal && typeof cachedVal === 'object' && !Array.isArray(cachedVal) &&
-            cachedVal.operator !== undefined && cachedVal.value !== undefined
-        case 'date':
-          return !!cachedVal && typeof cachedVal === 'object' && !Array.isArray(cachedVal) &&
-            (cachedVal.range !== undefined || cachedVal.value !== undefined)
-        case 'boolean':
-          return typeof cachedVal === 'boolean' || cachedVal === ''
-        default:
-          return !!cachedVal && typeof cachedVal === 'object' && !Array.isArray(cachedVal)
-      }
+      return isCachedFilterValueValid(meta, cachedVal)
     },
 
     _saveCachedFilters() {
@@ -209,7 +200,7 @@ export default {
 
     scrollFilterToTop() {
       this.$nextTick(() => {
-        const el = this.$el && this.$el.querySelector('.filter-form-scroll')
+        const el = this.$el && this.$el.querySelector('.filter-grid')
         if (el) el.scrollTop = 0
       })
     }
