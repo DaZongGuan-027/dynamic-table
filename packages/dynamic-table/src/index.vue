@@ -26,16 +26,21 @@
         <slot name="toolbar-left"></slot>
       </div>
       <div class="toolbar-right">
-        <el-button
+        <el-tooltip
           v-if="exportDataFn"
-          type="text"
-          icon="el-icon-download"
-          :loading="exportLoading"
-          :disabled="exportConfirming"
-          title="导出"
-          aria-label="导出"
-          @click="handleExport"
-        />
+          content="导出"
+          placement="top"
+          :open-delay="300"
+        >
+          <el-button
+            type="text"
+            icon="el-icon-download"
+            :loading="exportLoading"
+            :disabled="exportConfirming"
+            aria-label="导出"
+            @click="handleExport"
+          />
+        </el-tooltip>
         <el-button
           type="text"
           icon="el-icon-setting"

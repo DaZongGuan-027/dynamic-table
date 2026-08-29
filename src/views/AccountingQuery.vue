@@ -58,7 +58,7 @@ export default {
         },
         {
           fieldKey: 'accountDate',
-          fieldLabel: '记账日期',
+          fieldLabel: '记账日期记账日期记账日期记账日期',
           fieldType: 'date',
           filterable: true,
           sortable: true,

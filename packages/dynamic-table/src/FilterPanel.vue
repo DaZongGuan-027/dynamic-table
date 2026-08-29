@@ -19,8 +19,15 @@
             <div
               :key="meta.fieldKey"
               class="filter-grid-item"
+              :class="{ 'filter-grid-item--active': isFilterValueActive(filterValues[meta.fieldKey]) }"
             >
-              <div class="filter-label">{{ meta.fieldLabel }}</div>
+              <el-tooltip
+                :content="meta.fieldLabel"
+                placement="top"
+                :open-delay="0"
+              >
+                <div class="filter-label">{{ meta.fieldLabel }}</div>
+              </el-tooltip>
               <div class="filter-control">
                 <template v-if="hasEnumOptions(meta)">
                   <div class="compare-input">
@@ -182,7 +189,10 @@
         </div>
 
         <div class="custom-filter-section" v-if="showUniversalFilter && allDataFields.length > 0">
-          <div class="custom-filter-row">
+          <div
+            class="custom-filter-row"
+            :class="{ 'custom-filter-row--active': Object.keys(getCustomFilterValues()).length > 0 }"
+          >
             <div class="custom-filter-label">万能筛选</div>
             <el-select
               v-model="customFilter.fieldKey"
@@ -892,8 +902,28 @@ export default {
   color: #606266;
   margin-right: 8px;
   white-space: nowrap;
-  width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 80px;
   text-align: right;
+}
+.filter-grid-item--active .filter-label,
+.custom-filter-row--active .custom-filter-label {
+  color: #409eff;
+  font-weight: 500;
+}
+.filter-grid-item--active .filter-control >>> .el-input__inner,
+.filter-grid-item--active .filter-control >>> .el-range-editor.el-input__inner,
+.custom-filter-row--active .custom-filter-control >>> .el-input__inner,
+.custom-filter-row--active .custom-filter-control >>> .el-range-editor.el-input__inner {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+}
+.filter-control >>> .el-input__inner,
+.filter-control >>> .el-range-editor.el-input__inner,
+.custom-filter-control >>> .el-input__inner,
+.custom-filter-control >>> .el-range-editor.el-input__inner {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 .filter-control {
   flex: 1;
@@ -954,7 +984,7 @@ export default {
 }
 .custom-filter-label {
   flex-shrink: 0;
-  width: 60px;
+  width: 80px;
   margin-right: 2px;
   font-size: 13px;
   color: #606266;
