@@ -134,7 +134,8 @@
           v-else-if="isDataField(fieldKey) && orderedVisibleFields.includes(fieldKey)"
           :key="fieldKey"
           :prop="fieldKey"
-          :min-width="columnWidths[fieldKey] || (fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined) || (fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined)"
+          :width="columnWidths[fieldKey] || undefined"
+          :min-width="columnWidths[fieldKey] ? undefined : ((fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined) || (fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined))"
           :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
           :header-align="headerAlign"
           :fixed="getFrozenFixed(fieldKey)"
@@ -866,7 +867,10 @@ export default {
       this.lastCustomFilterValues = {}
       if (this.$refs.filterPanel) this.$refs.filterPanel.resetCustomFilters()
       this.scrollFilterToTop()
-      this.saveConfig()
+      if (this.saveConfigFn) {
+        this.saveConfigFn(null).catch(() => {})
+      }
+      this.config = null
       this.tableKey++
       this.$nextTick(() => {
         this.doLayout()
