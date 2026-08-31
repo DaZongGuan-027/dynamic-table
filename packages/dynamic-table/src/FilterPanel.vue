@@ -917,7 +917,7 @@ export default {
 .custom-filter-row--active .custom-filter-control >>> .el-input__inner,
 .custom-filter-row--active .custom-filter-control >>> .el-range-editor.el-input__inner {
   border-color: #409eff;
-  background-color: #ecf5ff;
+
 }
 .filter-control >>> .el-input__inner,
 .filter-control >>> .el-range-editor.el-input__inner,
