@@ -62,7 +62,7 @@ export default {
           fieldType: 'date',
           filterable: true,
           sortable: true,
-          width: 110,
+          width: 510,
           align: 'center'
         },
         {

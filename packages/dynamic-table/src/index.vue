@@ -135,7 +135,7 @@
           :key="fieldKey"
           :prop="fieldKey"
           :width="columnWidths[fieldKey] || undefined"
-          :min-width="columnWidths[fieldKey] ? undefined : ((fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined) || (fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined))"
+          :min-width="(fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined) || (fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined)"
           :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
           :header-align="headerAlign"
           :fixed="getFrozenFixed(fieldKey)"
@@ -867,8 +867,8 @@ export default {
       this.lastCustomFilterValues = {}
       if (this.$refs.filterPanel) this.$refs.filterPanel.resetCustomFilters()
       this.scrollFilterToTop()
-      if (this.saveConfigFn) {
-        this.saveConfigFn(null).catch(() => {})
+      if (this.deleteConfigFn) {
+        this.deleteConfigFn(this.menuId).catch(() => {})
       }
       this.config = null
       this.tableKey++

@@ -13,6 +13,7 @@ export default {
     fieldMetaList: { type: Array, required: true },
     loadConfigFn: { type: Function, default: null },
     saveConfigFn: { type: Function, default: null },
+    deleteConfigFn: { type: Function, default: null },
     configResponseAdapter: { type: Function, default: null },
     configErrorHandler: { type: Function, default: null },
     defaultFilterFields: { type: Array, default: () => [] }
