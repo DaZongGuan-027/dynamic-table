@@ -128,6 +128,19 @@ export default {
 
 ## API
 
+### 协议与兼容原则（必读）
+
+以下规则以组件实际传给回调函数的参数为准，页面和后端不要再各自推断或重新组装协议：
+
+1. **分页参数默认使用 `page`、`pageSize`。** 新接口应直接接收这两个默认字段。已有接口无需为了接入组件而改造：如果后端已经使用 `pageNum` 或其他字段名，通过 `pageParamName`、`pageSizeParamName` 配置组件即可。配置后，该名称就是组件实际输出的协议，后端必须按该名称接收。
+2. **`fetchDataFn` 应原样透传组件参数。** 不要在页面内把 `page` 改成 `pageNum`，也不要把 `filters` 再包一层；参数名适配应通过组件 Props 完成。
+3. **筛选结构必须按字段类型处理。** 文本/数值使用 `{ operator, value }`，区间使用 `{ range }`，单个日期或未转换的单月使用 `{ value }`，枚举和布尔使用标量或数组。后端不能把 `{ value }` 当作无效格式。
+4. **操作符语义不可混用。** `eq` 是精确等于，`contains` 才是包含；文本字段只是默认选择 `contains`，不代表 `eq` 也按模糊查询处理。
+5. **全量导出默认使用组件内置 `exportDataFn`。** 组件负责提交当前可见导出字段、字段顺序、合并后的筛选条件和排序条件，后端负责查询全部匹配数据并生成文件。业务可以通过 `toolbar-left` 另行实现特殊导出，但不要把它描述成组件默认导出协议。
+6. **业务逻辑只读取公开方法。** 业务按钮需要使用当前筛选条件时调用 `this.$refs.dynamicTable.getFilters()`；不要直接访问 `filterValues`、`columnSearchValues` 等内部状态，因为公开方法才会返回筛选面板、表头搜索和万能筛选合并后的最终请求条件。
+
+> “后端服从组件协议”指后端接收组件**最终输出**的字段名。默认输出是 `page/pageSize`；已有接口通过 Props 配置后可以继续使用原字段名，不要求存量接口改名。
+
 ### Props
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -150,9 +163,9 @@ export default {
 | tableHeight | String/Number | 否 | undefined | 固定表格高度，不设置则自适应（flex 布局） |
 | maxHeight | String/Number | 否 | undefined | 表格最大高度，作为 `tableHeight` 或自适应高度的上限，超出后表格内部滚动 |
 | showPagination | Boolean | 否 | true | 是否显示分页 |
-| pageSizes | Array | 否 | [10,50,100,500] | 每页条数选项；当前页面初始展示条数取其中最小值 |
-| pageSizeParamName | String | 否 | 'pageSize' | 分页大小参数名 |
-| pageParamName | String | 否 | 'page' | 页码参数名 |
+| pageSizes | Array | 否 | [10,50,100,500] | 每页条数选项；当前页面初始展示条数取其中最小值。配置界面允许 1～2000，后端允许的最大值应与业务传入的选项一致 |
+| pageSizeParamName | String | 否 | 'pageSize' | 组件传给 `fetchDataFn` 的分页大小字段名；已有后端字段不同时在此适配 |
+| pageParamName | String | 否 | 'page' | 组件传给 `fetchDataFn` 的页码字段名；已有后端使用 `pageNum` 时配置为 `pageNum` |
 | headerAlign | String | 否 | 'center' | 表头对齐方式，默认居中 |
 | actionColumnWidth | String/Number | 否 | 150 | 操作列默认宽度 |
 | defaultFilterValues | Object | 否 | {} | 筛选条件默认值 |
@@ -185,10 +198,18 @@ export default {
 | align | String | 否 | 对齐方式：`left` / `center` / `right` |
 | enumValues | Array/Object | 否 | 枚举值，支持数组 `[{ label, value }]` 或 Map `{ '001': '技术部' }` |
 | filterMultiple | Boolean | 否 | 枚举下拉是否允许多选，默认 `true`；设为 `false` 时筛选面板、表头筛选和万能筛选均为单选 |
-| frozenPosition | String | 否 | 冻结位置：`'left'` / `'right'`，不设置则不冻结 |
+| frozenPosition | String | 否 | 冻结方向提示：`'left'` / `'right'`；列是否冻结仍由表格配置及已保存的 `frozenFields` 决定 |
 | dateFilterType | String | 否 | 日期筛选类型：`daterange`（默认）/ `monthrange` / `month` / `date` |
 | monthToDateRange | Boolean | 否 | 默认 `false`；当 `dateFilterType: 'month'` 时，设为 `true` 会将所选月份转换为当月月初至月末的 `{ range }` |
 | dateFormat | String | 否 | 日期展示格式：`yyyy-MM-dd`（默认）/ `yyyy-MM` / `yyyy-MM-dd HH:mm:ss` |
+
+字段元数据当前**不支持** Element UI 风格的 `fixed`、`visible`、`showOverflowTooltip` 作为逐列控制项：
+
+- 初始显示列使用组件 Prop `defaultVisibleFields`；用户调整后的显示状态由表格配置保存。
+- 冻结列通过“表格配置”设置并保存；`frozenPosition` 只用于表达冻结方向，不等同于 `fixed`。
+- 数据列统一启用内容溢出提示，当前不提供逐列关闭或开启的 `showOverflowTooltip`。
+
+迁移旧页面时应删除这些无效字段，避免使用者误以为配置已经生效。
 
 #### 特殊列
 
@@ -298,6 +319,19 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 
 通过表格组件 `ref` 可调用：`refresh()`、`retry()`、`resetFilters()`、`getFilters()`、`getExportFields()`、`getTableConfig()`、`getSelection()`、`clearSelection()`、`toggleRowSelection(row, selected)`、`doLayout()` 和 `getElTable()`。
 
+`getFilters()` 返回的就是下一次列表查询和组件内置导出使用的合并筛选条件。同步、批量处理、业务导出等按钮如果需要沿用表格当前条件，应这样读取：
+
+```js
+handleSync() {
+  const filters = this.$refs.dynamicTable
+    ? this.$refs.dynamicTable.getFilters()
+    : {}
+  return syncData({ filters })
+}
+```
+
+不要读取 `this.$refs.dynamicTable.filterValues`、`columnSearchValues` 或 `lastCustomFilterValues`。这些是组件内部的分段状态，单独读取任何一项都可能与当前列表的实际筛选条件不一致，后续版本也不保证其结构稳定。
+
 ### fetchDataFn 参数格式
 
 ```js
@@ -317,6 +351,18 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
   sortOrder: 'descending'
 }
 ```
+
+上例使用组件默认分页字段。如果已有后端接收 `pageNum`，页面只需配置参数名：
+
+```vue
+<dynamic-table
+  page-param-name="pageNum"
+  page-size-param-name="pageSize"
+  :fetch-data-fn="fetchDataFn"
+/>
+```
+
+此时 `fetchDataFn` 收到的是 `{ pageNum, pageSize, filters, sortBy, sortOrder }`。已有接口不需要改字段名；`fetchDataFn` 仍然直接把 `params` 交给接口，不做二次转换。新接口未配置上述 Props 时，应按默认的 `page/pageSize` 接收。
 
 `fetchDataFn` 的第二个参数为请求上下文，可将 `signal` 交给 Axios 或 Fetch，以便组件在翻页、快速筛选、切换菜单和销毁时取消旧请求：
 
@@ -356,6 +402,13 @@ fetchDataFn(params, { signal }) {
 | lte | 小于等于 | number, currency |
 
 > 字符串类型默认操作符为 `contains`，数值/金额类型默认操作符为 `eq`。`in` 操作符会将输入值按英文逗号 `,`、中文逗号 `，`、中文顿号 `、`、斜杠 `/` 拆分为数组传递到后端。
+
+这里的“默认”只表示控件初次选择的操作符，不会改变操作符本身的含义：
+
+- `{ operator: 'eq', value: '张' }`：只匹配值等于“张”的记录。
+- `{ operator: 'contains', value: '张' }`：匹配值中包含“张”的记录。
+
+后端必须按 `operator` 分支处理，不能把所有字符串条件统一解释为精确匹配或统一解释为模糊匹配。
 
 ### fetchDataFn 返回格式
 
@@ -418,6 +471,8 @@ exportDataFn({ menuId, fields, filters, sortBy, sortOrder }) {
 - 服务端负责查询全部匹配数据并生成文件；组件不会循环查询分页接口。
 - 支持直接返回 `Blob`、`{ blob, fileName }`、Axios Blob 响应或 `{ downloadUrl, fileName }`。
 - Axios 模式必须配置 `responseType: 'blob'`。
+
+这是组件的默认全量导出方式，接入方通常只需要实现 `exportDataFn`。如果某个页面存在完全不同的业务导出（例如导出勾选记录、导出固定模板），可以在 `toolbar-left` 中自行增加按钮；该按钮的参数和交互由业务页面负责，不会替代或改变 `exportDataFn` 的协议。为避免出现两个含义相同的导出入口，同一页面不要同时配置内置全量导出和同功能的自定义按钮。
 
 ### loadConfigFn 返回格式
 
@@ -567,7 +622,10 @@ exportDataFn({ menuId, fields, filters, sortBy, sortOrder }) {
 ### 分页
 - 固定在表格底部，不随数据高度变化
 - 可在配置抽屉的“参数配置” tab 中自定义分页条数选项，当前页面初始展示条数始终取已选选项中的最小值
-- 默认已选条数为 10/50/100/500；支持预设条数快选（10/20/50/100/200/500/1000/2000），也可手动输入自定义条数
+- 默认已选条数为 10/50/100/500；支持预设条数快选（10/20/50/100/200/500/1000/2000），也可手动输入 1～2000 的自定义条数
+- 清空用户保存的分页选项时，会回退到 `pageSizes` Prop；不会固定回退为 1。未传 `pageSizes` 时回退到默认的 10/50/100/500，并取 10 作为当前条数
+- 后端分页上限必须与页面实际提供的 `pageSizes` 一致。如果后端最多只允许 500，页面就不应提供 1000/2000；若页面允许选择 2000，后端也必须正确接收 2000，不能静默截断后仍返回不匹配的分页结果
+- 分页字段默认是 `page/pageSize`。存量接口可用 `pageParamName/pageSizeParamName` 保留原字段名，配置后的字段名就是后端必须接收的协议
 
 ## 后端接口设计
 
@@ -708,12 +766,13 @@ CREATE TABLE t_table_config (
 | number/currency | `{ operator, value }` | 根据 operator 拼接 SQL：`eq` → `=`, `neq` → `!=`, `gt` → `>`, `lt` → `<`, `gte` → `>=`, `lte` → `<=` |
 | enum（单选） | `value` | `= value` |
 | enum（多选） | `[value1, value2]` | `IN (value1, value2)` |
-| date | `{ range: [start, end] }` | 使用 `range[0]`、`range[1]` 进行 `BETWEEN` 查询 |
+| date（日期/月份区间或单月转区间） | `{ range: [start, end] }` | 使用 `range[0]`、`range[1]` 进行区间查询 |
+| date（单个日期或未转换的单月） | `{ value }` | 使用 `value` 进行等值查询；单月值格式为 `yyyy-MM` |
 | boolean | `true/false` | `= true` 或 `= false` |
 
 **设计要点**：
 - `filters` 中的 key 为 `fieldKey`，后端需映射为实际数据库字段名
-- 日期筛选统一使用 `{ range }`，单月模式会自动转换为当月 1 日和月末日期
+- `daterange`、`monthrange` 以及 `monthToDateRange: true` 的单月筛选使用 `{ range }`；`date` 和默认单月筛选使用 `{ value }`，后端必须同时支持这两种日期结构
 - 枚举单选值为标量，使用等值查询；多选值为数组，使用 `IN` 查询
 - 排序字段 `sortBy` 需映射为数据库字段名，`sortOrder` 为 `ascending` / `descending`
 - 建议对 `filters` 中的值做 SQL 注入防护（参数化查询）
@@ -770,7 +829,7 @@ public static <T> void buildFilters(QueryWrapper<T> wrapper, Map<String, Object>
         String column = getColumnName(field); // 获取 @TableField 注解的列名，无注解则驼峰转下划线
 
         if (value instanceof Map) {
-            // 操作符筛选：{ operator, value } 或 { range: [start, end] }
+            // 对象筛选：{ operator, value }、{ range: [start, end] } 或 { value }
             Map<String, Object> filterMap = (Map<String, Object>) value;
             if (filterMap.containsKey("operator")) {
                 String operatorCode = (String) filterMap.get("operator");
@@ -783,6 +842,12 @@ public static <T> void buildFilters(QueryWrapper<T> wrapper, Map<String, Object>
                 List<?> range = (List<?>) filterMap.get("range");
                 if (range.size() == 2) {
                     wrapper.between(column, range.get(0), range.get(1));
+                }
+            } else if (filterMap.containsKey("value")) {
+                // 单个日期或未转换的单月
+                Object singleValue = filterMap.get("value");
+                if (singleValue != null && !singleValue.toString().isEmpty()) {
+                    wrapper.eq(column, singleValue);
                 }
             }
         } else if (value instanceof List) {
