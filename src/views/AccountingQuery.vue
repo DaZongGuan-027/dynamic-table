@@ -218,7 +218,7 @@ export default {
           width: 80,
           align: 'center'
         },
-        { fieldKey: '__actions', fieldLabel: '操作', fieldType: 'actions', width: 150, frozenPosition: 'right', actions: [
+        { fieldKey: '__actions', fieldLabel: '操作', fieldType: 'actions', width: 450, frozenPosition: 'right', actions: [
           { label: '查看凭证', action: 'view' },
           { label: '修改', action: 'edit' },
           { label: '删除', action: 'delete', style: { color: '#f56c6c' } }
