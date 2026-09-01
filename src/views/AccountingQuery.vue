@@ -8,6 +8,7 @@
     export-file-name="核算数据"
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
+    :delete-config-fn="deleteConfigFn"
     :default-visible-fields="defaultVisibleFields"
     :default-filter-fields="defaultFilterFields"
     :show-summary="true"
@@ -22,7 +23,7 @@
 
 <script>
 import DynamicTable from '../../packages/dynamic-table/src/index.vue'
-import { getAccountingData, exportAccountingData, getTableConfig, saveTableConfig } from '../mock/api'
+import { fetchTableData, exportTableData, fetchTableConfig, saveTableConfig, deleteTableConfig } from '../mock/api'
 
 export default {
   name: 'AccountingQuery',
@@ -229,19 +230,23 @@ export default {
 
   methods: {
     fetchDataFn(params) {
-      return getAccountingData(params)
+      return fetchTableData(params)
     },
 
     exportDataFn(params) {
-      return exportAccountingData(params)
+      return exportTableData(params)
     },
 
     loadConfigFn(menuId) {
-      return getTableConfig(menuId)
+      return fetchTableConfig(menuId)
     },
 
     saveConfigFn(config) {
       return saveTableConfig(config)
+    },
+
+    deleteConfigFn(menuId) {
+      return deleteTableConfig(menuId)
     },
 
 

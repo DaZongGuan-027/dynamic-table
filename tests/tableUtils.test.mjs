@@ -42,6 +42,22 @@ test('reads version 2 settings and migrates legacy column width settings', () =>
   }), { pageSizes: [10, 100], showSummary: false, showUniversalFilter: true })
 })
 
+test('migrates legacy top-level pageSizes (v1.1.x) when settings are missing', () => {
+  assert.deepEqual(readTableSettings({ pageSizes: '[100,500,1000]' }), {
+    pageSizes: [100, 500, 1000], showSummary: undefined, showUniversalFilter: undefined
+  })
+  assert.deepEqual(readTableSettings({ pageSizes: [100, 500, 1000] }), {
+    pageSizes: [100, 500, 1000], showSummary: undefined, showUniversalFilter: undefined
+  })
+})
+
+test('settings.pageSizes takes precedence over legacy pageSizes fields', () => {
+  assert.deepEqual(readTableSettings(
+    { settings: '{"pageSizes":[100,500]}', pageSizes: '[10,20]' },
+    { __pageSizes: [1, 2] }
+  ), { pageSizes: [100, 500], showSummary: undefined, showUniversalFilter: undefined })
+})
+
 test('rejects malformed configuration field types', () => {
   assert.deepEqual(parseJsonArray('["name"]'), ['name'])
   assert.equal(parseJsonArray('{"name":true}'), null)

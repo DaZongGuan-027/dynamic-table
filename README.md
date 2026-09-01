@@ -488,11 +488,12 @@ exportDataFn({ menuId, fields, filters, sortBy, sortOrder }) {
   filterFields: '["username","status"]',
   columnOrder: '["username","age","status"]',
   filterSchemes: '[{"name":"方案1","filterValues":{}}]',
-  settings: '{"pageSizes":[10,50,100,500],"showSummary":true,"showUniversalFilter":true}'
+  settings: '{"pageSizes":[10,50,100,500],"showSummary":true,"showUniversalFilter":true}',
+  pageSizes: '[10,50,100,500]'                          // 兼容旧版后端的冗余字段（可选）
 }
 ```
 
-`version: 2` 将分页选项和功能开关独立存入 `settings`。组件仍兼容旧配置中保存在 `columnWidths` 的 `__pageSizes`、`__showSummary`、`__showUniversalFilter`，读取后自动迁移，后续保存即写为 version 2。
+`version: 2` 将分页选项和功能开关独立存入 `settings`。组件仍兼容旧配置：保存在 `columnWidths` 的 `__pageSizes`、`__showSummary`、`__showUniversalFilter`，以及 v1.1.x 顶层 `pageSizes` 字段，读取后自动迁移，后续保存即写为 version 2。为避免后端字段白名单丢弃 `settings` 导致分页参数丢失，保存时除 `settings.pageSizes` 外还会同步写入顶层 `pageSizes`（读取时 `settings` 优先）。
 
 配置接口同样兼容直接对象、Axios 和 `{ code, data }` 包装。若接口结构不同，可通过 `configResponseAdapter` 转换。配置加载异常会触发 `config-error`，且在重新加载成功前阻止保存；连续保存会按顺序执行，避免旧请求晚返回覆盖新配置。
 

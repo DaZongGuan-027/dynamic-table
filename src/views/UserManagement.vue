@@ -6,6 +6,7 @@
     :fetch-data-fn="fetchDataFn"
     :load-config-fn="loadConfigFn"
     :save-config-fn="saveConfigFn"
+    :delete-config-fn="deleteConfigFn"
     row-key="id"
 
     @selection-change="handleSelectionChange"
@@ -32,7 +33,7 @@
 
 <script>
 import DynamicTable from '../../packages/dynamic-table/src/index.vue'
-import { getTableData, getTableConfig, saveTableConfig } from '../mock/api'
+import { fetchTableData, fetchTableConfig, saveTableConfig, deleteTableConfig } from '../mock/api'
 
 export default {
   name: 'UserManagement',
@@ -67,15 +68,19 @@ export default {
 
   methods: {
     fetchDataFn(params) {
-      return getTableData(params)
+      return fetchTableData(params)
     },
 
     loadConfigFn(menuId) {
-      return getTableConfig(menuId)
+      return fetchTableConfig(menuId)
     },
 
     saveConfigFn(config) {
       return saveTableConfig(config)
+    },
+
+    deleteConfigFn(menuId) {
+      return deleteTableConfig(menuId)
     },
 
     handleSelectionChange(selection) {

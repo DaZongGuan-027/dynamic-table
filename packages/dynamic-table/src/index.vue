@@ -80,8 +80,7 @@
           v-if="fieldKey === selectionFieldKey && hasSelection && isSpecialVisible(fieldKey)"
           :key="fieldKey"
           type="selection"
-          :width="columnWidths[fieldKey] || undefined"
-          :min-width="(fieldMetaMap[fieldKey] && fieldMetaMap[fieldKey].width) || 50"
+          :min-width="getColumnMinWidth(fieldKey)"
           :fixed="getFrozenFixed(fieldKey)"
           :header-align="headerAlign"
           align="center"
@@ -93,8 +92,7 @@
           :key="fieldKey"
           type="index"
           label="#"
-          :width="columnWidths[fieldKey] || undefined"
-          :min-width="(fieldMetaMap[fieldKey] && fieldMetaMap[fieldKey].width) || 50"
+          :min-width="getColumnMinWidth(fieldKey)"
           :fixed="getFrozenFixed(fieldKey)"
           :header-align="headerAlign"
           align="center"
@@ -108,8 +106,7 @@
           v-else-if="fieldKey === actionsFieldKey && hasRowActions && isSpecialVisible(fieldKey)"
           :key="fieldKey"
           label="操作"
-          :width="columnWidths[fieldKey] || undefined"
-          :min-width="(fieldMetaMap[fieldKey] && fieldMetaMap[fieldKey].width) || actionColumnWidth"
+          :min-width="getColumnMinWidth(fieldKey)"
           :fixed="getActionColumnFixed"
           :header-align="headerAlign"
           align="center"
@@ -137,8 +134,7 @@
           v-else-if="isDataField(fieldKey) && orderedVisibleFields.includes(fieldKey)"
           :key="fieldKey"
           :prop="fieldKey"
-          :width="columnWidths[fieldKey] || undefined"
-          :min-width="(fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].width : undefined) || (fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].minWidth : undefined)"
+          :min-width="getColumnMinWidth(fieldKey)"
           :align="fieldMetaMap[fieldKey] ? fieldMetaMap[fieldKey].align : 'left'"
           :header-align="headerAlign"
           :fixed="getFrozenFixed(fieldKey)"
@@ -713,6 +709,19 @@ export default {
     isDataField(key) {
       const meta = this.fieldMetaMap[key]
       return !!meta && !['selection', 'index', 'actions'].includes(meta.fieldType)
+    },
+
+    getColumnMinWidth(fieldKey) {
+      const configured = this.columnWidths[fieldKey]
+      if (configured !== undefined && configured !== null && configured !== '') return configured
+      const meta = this.fieldMetaMap[fieldKey]
+      if (meta) {
+        if (meta.width !== undefined && meta.width !== null && meta.width !== '') return meta.width
+        if (meta.minWidth !== undefined && meta.minWidth !== null && meta.minWidth !== '') return meta.minWidth
+      }
+      if (fieldKey === this.selectionFieldKey || fieldKey === this.indexFieldKey) return 50
+      if (fieldKey === this.actionsFieldKey) return this.actionColumnWidth
+      return 80
     },
 
     _formatCurrency(value) {

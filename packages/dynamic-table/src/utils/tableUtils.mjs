@@ -35,7 +35,8 @@ export function readTableSettings(config, columnWidths = {}) {
     try { settings = JSON.parse(settings) } catch (e) { settings = {} }
   }
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) settings = {}
-  const pageSizes = settings.pageSizes || columnWidths.__pageSizes
+  // 兼容旧版配置：优先 settings.pageSizes，其次 columnWidths.__pageSizes，最后顶层 pageSizes（v1.1.x 格式）
+  const pageSizes = settings.pageSizes || columnWidths.__pageSizes || parseJsonArray(config && config.pageSizes)
   const showSummary = settings.showSummary !== undefined ? settings.showSummary : columnWidths.__showSummary
   const showUniversalFilter = settings.showUniversalFilter !== undefined
     ? settings.showUniversalFilter

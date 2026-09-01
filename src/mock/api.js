@@ -1,18 +1,61 @@
-const STORAGE_PREFIX = 'dynamic_table_config_'
+import axios from 'axios'
 
-function toTimestamp(value) {
-  if (value === null || value === undefined || value === '') return NaN
-  const text = String(value)
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(text)
-    ? text + 'T00:00:00'
-    : text.replace(' ', 'T')
-  return Date.parse(normalized)
+/**
+ * 模拟后端接口层
+ * ------------------------------------------------------------
+ * 通过 axios 自定义 adapter 在浏览器内模拟真实 HTTP 接口调用，
+ * 供测试页面使用。接入真实后端时，仅需删除 adapter 并指向真实
+ * baseURL，页面侧接口函数无需改动。
+ *
+ * 模拟的接口：
+ *   GET    /api/table/data    查询列表数据（筛选/排序/分页）
+ *   GET    /api/table/config  查询表格配置
+ *   POST   /api/table/config  保存表格配置
+ *   DELETE /api/table/config  删除表格配置
+ *   GET    /api/table/export  导出数据（返回 Blob + 文件名）
+ *
+ * 统一响应结构（与常见后端约定一致）：
+ *   { code: 200, message: '操作成功', data: ... }
+ * ------------------------------------------------------------
+ */
+
+// 模拟当前登录用户（真实场景由后端从会话中识别）
+const CURRENT_USER = { userId: 'U001', userName: '测试管理员' }
+
+// 模拟网络延迟 200 ~ 600ms
+const NETWORK_LATENCY = () => 200 + Math.floor(Math.random() * 400)
+
+// 模拟服务端日志输出
+function serverLog(method, url, status, cost) {
+  // eslint-disable-next-line no-console
+  console.log(`[mock-server] ${method.toUpperCase()} ${url} ${status} ${cost}ms`)
 }
 
-function toCellText(value) {
-  return value === null || value === undefined ? '' : String(value)
+// ============================================================
+// 模拟数据库：表格配置（localStorage 持久化，按用户隔离）
+// ============================================================
+const CONFIG_STORAGE_PREFIX = 'dynamic_table_config_'
+
+function configStorageKey(menuId) {
+  return CONFIG_STORAGE_PREFIX + menuId + '_' + CURRENT_USER.userId
 }
 
+function dbGetConfig(menuId) {
+  const raw = localStorage.getItem(configStorageKey(menuId))
+  return raw ? JSON.parse(raw) : null
+}
+
+function dbSaveConfig(menuId, config) {
+  localStorage.setItem(configStorageKey(menuId), JSON.stringify(config))
+}
+
+function dbDeleteConfig(menuId) {
+  localStorage.removeItem(configStorageKey(menuId))
+}
+
+// ============================================================
+// 模拟数据库：业务列表数据
+// ============================================================
 const mockTableData = [
   { id: 1, username: '张三', age: 28, status: 1, birthday: '1996-05-12', email: 'zhangsan@test.com', role: 'admin', createTime: '2024-01-15 10:30:00', department: '技术部', phone: '13800001111' },
   { id: 2, username: '李四', age: 34, status: 1, birthday: '1990-08-22', email: 'lisi@test.com', role: 'user', createTime: '2024-02-20 14:15:00', department: '市场部', phone: '13800002222' },
@@ -49,162 +92,252 @@ const mockAccountingData = [
   { id: 18, voucherNo: 'PZ-2024-0008', accountDate: '2024-02-15', period: '2024-02', subjectCode: '1122', subjectName: '应收账款', summary: '出口销售', debitAmount: 355000, creditAmount: 0, balanceDirection: '借', balance: 718000, accountingEntity: '分公司一', currency: 'USD', auxiliaryItem: '美国C公司', maker: '刘会计', reviewer: '李主管', bookkeeper: '王财务' },
 ]
 
-function getStorageKey(menuId, userId) {
-  return STORAGE_PREFIX + menuId + '_' + userId
+function resolveDataset(menuId) {
+  return menuId === 'M001' ? mockTableData : mockAccountingData
 }
 
-export function getTableConfig(menuId, userId) {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const key = getStorageKey(menuId, userId)
-      const raw = localStorage.getItem(key)
-      if (raw) {
-        resolve(JSON.parse(raw))
+// ============================================================
+// 服务端处理逻辑：筛选 / 排序 / 分页
+// ============================================================
+function toTimestamp(value) {
+  if (value === null || value === undefined || value === '') return NaN
+  const text = String(value)
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? text + 'T00:00:00'
+    : text.replace(' ', 'T')
+  return Date.parse(normalized)
+}
+
+function toCellText(value) {
+  return value === null || value === undefined ? '' : String(value)
+}
+
+function queryList(dataSource, params = {}) {
+  let filtered = [...dataSource]
+
+  if (params.filters) {
+    Object.keys(params.filters).forEach(fieldKey => {
+      const val = params.filters[fieldKey]
+      if (val === null || val === undefined || val === '') return
+
+      if (typeof val === 'object' && !Array.isArray(val)) {
+        if (val.range !== undefined && Array.isArray(val.range) && val.range.length === 2) {
+          filtered = filtered.filter(row => row[fieldKey] >= val.range[0] && row[fieldKey] <= val.range[1])
+        } else if (val.operator !== undefined && val.value !== '' && val.value !== null && val.value !== undefined) {
+          const op = val.operator
+          const fv = val.value
+          switch (op) {
+            case 'eq':
+              filtered = filtered.filter(row => String(row[fieldKey]) === String(fv)); break
+            case 'neq':
+              filtered = filtered.filter(row => String(row[fieldKey]) !== String(fv)); break
+            case 'contains':
+              filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase())); break
+            case 'notContains':
+              filtered = filtered.filter(row => !toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase())); break
+            case 'startsWith':
+              filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().startsWith(String(fv).toLowerCase())); break
+            case 'endsWith':
+              filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().endsWith(String(fv).toLowerCase())); break
+            case 'gt':
+              filtered = filtered.filter(row => Number(row[fieldKey]) > Number(fv)); break
+            case 'lt':
+              filtered = filtered.filter(row => Number(row[fieldKey]) < Number(fv)); break
+            case 'gte':
+              filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(fv)); break
+            case 'lte':
+              filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(fv)); break
+            default:
+              filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase()))
+          }
+        } else if (val.min !== null && val.min !== undefined && val.min !== '') {
+          filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(val.min))
+        } else if (val.max !== null && val.max !== undefined && val.max !== '') {
+          filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(val.max))
+        } else if (val.start || val.end) {
+          const startTime = val.start ? toTimestamp(val.start) : -Infinity
+          const endTime = val.end ? toTimestamp(val.end) : Infinity
+          filtered = filtered.filter(row => {
+            const rowTime = toTimestamp(row[fieldKey])
+            return !isNaN(rowTime) && rowTime >= startTime && rowTime <= endTime
+          })
+        } else if (val.value !== '' && val.value !== null && val.value !== undefined) {
+          filtered = filtered.filter(row => toCellText(row[fieldKey]).startsWith(String(val.value)))
+        }
+      } else if (Array.isArray(val)) {
+        if (val.length > 0) {
+          filtered = filtered.filter(row => val.includes(row[fieldKey]))
+        }
       } else {
-        resolve(null)
-      }
-    }, 200)
-  })
-}
-
-export function saveTableConfig(config) {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const key = getStorageKey(config.menuId, config.userId)
-      localStorage.setItem(key, JSON.stringify(config))
-      resolve({ success: true })
-    }, 200)
-  })
-}
-
-export function getTableData(params = {}) {
-  return _queryData(mockTableData, params)
-}
-
-export function getAccountingData(params = {}) {
-  return _queryData(mockAccountingData, params)
-}
-
-// 模拟后端导出接口：生产环境应由服务端查询全量数据并返回文件。
-export function exportAccountingData(params = {}) {
-  return _queryData(mockAccountingData, {
-    filters: params.filters,
-    sortBy: params.sortBy,
-    sortOrder: params.sortOrder,
-    page: 1,
-    pageSize: mockAccountingData.length
-  }).then(result => {
-    const fields = params.fields || []
-    const escapeCsvValue = value => {
-      let text = value === null || value === undefined ? '' : String(value)
-      if (/^[=+\-@]/.test(text)) text = "'" + text
-      return '"' + text.replace(/"/g, '""') + '"'
-    }
-    const rows = [
-      fields.map(field => escapeCsvValue(field.fieldLabel)).join(','),
-      ...result.list.map(row => fields.map(field => escapeCsvValue(row[field.fieldKey])).join(','))
-    ]
-    return {
-      blob: new Blob(['\ufeff' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' }),
-      fileName: '核算数据.csv'
-    }
-  })
-}
-
-function _queryData(dataSource, params = {}) {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      let filtered = [...dataSource]
-
-      if (params.filters) {
-        Object.keys(params.filters).forEach(fieldKey => {
-          const val = params.filters[fieldKey]
-          if (val === null || val === undefined || val === '') return
-
-          if (typeof val === 'object' && !Array.isArray(val)) {
-            if (val.range !== undefined && Array.isArray(val.range) && val.range.length === 2) {
-              filtered = filtered.filter(row => row[fieldKey] >= val.range[0] && row[fieldKey] <= val.range[1])
-            } else if (val.operator !== undefined && val.value !== '' && val.value !== null && val.value !== undefined) {
-              const op = val.operator
-              const fv = val.value
-              switch (op) {
-                case 'eq':
-                  filtered = filtered.filter(row => String(row[fieldKey]) === String(fv)); break
-                case 'neq':
-                  filtered = filtered.filter(row => String(row[fieldKey]) !== String(fv)); break
-                case 'contains':
-                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase())); break
-                case 'notContains':
-                  filtered = filtered.filter(row => !toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase())); break
-                case 'startsWith':
-                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().startsWith(String(fv).toLowerCase())); break
-                case 'endsWith':
-                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().endsWith(String(fv).toLowerCase())); break
-                case 'gt':
-                  filtered = filtered.filter(row => Number(row[fieldKey]) > Number(fv)); break
-                case 'lt':
-                  filtered = filtered.filter(row => Number(row[fieldKey]) < Number(fv)); break
-                case 'gte':
-                  filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(fv)); break
-                case 'lte':
-                  filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(fv)); break
-
-                default:
-                  filtered = filtered.filter(row => toCellText(row[fieldKey]).toLowerCase().includes(String(fv).toLowerCase()))
-              }
-            } else if (val.min !== null && val.min !== undefined && val.min !== '') {
-              filtered = filtered.filter(row => Number(row[fieldKey]) >= Number(val.min))
-            } else if (val.max !== null && val.max !== undefined && val.max !== '') {
-              filtered = filtered.filter(row => Number(row[fieldKey]) <= Number(val.max))
-            } else if (val.start || val.end) {
-              const startTime = val.start ? toTimestamp(val.start) : -Infinity
-              const endTime = val.end ? toTimestamp(val.end) : Infinity
-              filtered = filtered.filter(row => {
-                const rowTime = toTimestamp(row[fieldKey])
-                return !isNaN(rowTime) && rowTime >= startTime && rowTime <= endTime
-              })
-            } else if (val.value !== '' && val.value !== null && val.value !== undefined) {
-              filtered = filtered.filter(row => toCellText(row[fieldKey]).startsWith(String(val.value)))
-            }
-          } else if (Array.isArray(val)) {
-            if (val.length > 0) {
-              filtered = filtered.filter(row => val.includes(row[fieldKey]))
-            }
-          } else {
-            filtered = filtered.filter(row => {
-              const cellVal = toCellText(row[fieldKey])
-              return cellVal.toLowerCase().includes(String(val).toLowerCase())
-            })
-          }
+        filtered = filtered.filter(row => {
+          const cellVal = toCellText(row[fieldKey])
+          return cellVal.toLowerCase().includes(String(val).toLowerCase())
         })
       }
+    })
+  }
 
-      if (params.sortBy && params.sortOrder) {
-        filtered.sort((a, b) => {
-          const va = a[params.sortBy]
-          const vb = b[params.sortBy]
-          let result = 0
-          if (typeof va === 'number' && typeof vb === 'number') {
-            result = va - vb
-          } else {
-            result = String(va || '').localeCompare(String(vb || ''))
-          }
-          return params.sortOrder === 'descending' ? -result : result
-        })
+  if (params.sortBy && params.sortOrder) {
+    filtered.sort((a, b) => {
+      const va = a[params.sortBy]
+      const vb = b[params.sortBy]
+      let result = 0
+      if (typeof va === 'number' && typeof vb === 'number') {
+        result = va - vb
+      } else {
+        result = String(va || '').localeCompare(String(vb || ''))
       }
+      return params.sortOrder === 'descending' ? -result : result
+    })
+  }
 
-      const page = params.page || 1
-      const pageSize = params.pageSize || 10
-      const start = (page - 1) * pageSize
-      const end = start + pageSize
-      const list = filtered.slice(start, end)
+  const page = Number(params.page) || 1
+  const pageSize = Number(params.pageSize) || 10
+  const start = (page - 1) * pageSize
+  const end = start + pageSize
+  const list = filtered.slice(start, end)
 
-      resolve({
-        list,
-        total: filtered.length,
-        page,
-        pageSize
+  return { list, total: filtered.length, page, pageSize }
+}
+
+// ============================================================
+// 服务端处理逻辑：导出 CSV
+// ============================================================
+function buildCsvBlob(list, fields) {
+  const escapeCsvValue = value => {
+    let text = value === null || value === undefined ? '' : String(value)
+    if (/^[=+\-@]/.test(text)) text = "'" + text
+    return '"' + text.replace(/"/g, '""') + '"'
+  }
+  const rows = [
+    fields.map(field => escapeCsvValue(field.fieldLabel)).join(','),
+    ...list.map(row => fields.map(field => escapeCsvValue(row[field.fieldKey])).join(','))
+  ]
+  return new Blob(['\ufeff' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+}
+
+function resolveExportFileName(menuId) {
+  return menuId === 'M001' ? '用户数据.csv' : '核算数据.csv'
+}
+
+// ============================================================
+// 统一响应包装（模拟后端返回结构）
+// ============================================================
+function ok(data, message = '操作成功') {
+  return { code: 200, message, data: data === undefined ? null : data }
+}
+
+// ============================================================
+// 路由处理：模拟服务端 Controller
+// 返回 { data, headers? }
+// ============================================================
+function handleApi(config) {
+  const method = (config.method || 'get').toLowerCase()
+  const url = config.url || ''
+  const params = config.params || {}
+  let body = config.data
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body) } catch (e) { body = {} }
+  }
+  body = body || {}
+
+  if (url === '/table/data') {
+    if (method === 'get') {
+      const dataset = resolveDataset(params.menuId)
+      return { data: ok(queryList(dataset, params), '查询成功') }
+    }
+  }
+
+  if (url === '/table/config') {
+    if (method === 'get') {
+      return { data: ok(dbGetConfig(params.menuId), '查询成功') }
+    }
+    if (method === 'post') {
+      if (!body.menuId) return { data: ok(null, '保存失败：缺少 menuId'), status: 400 }
+      dbSaveConfig(body.menuId, body)
+      return { data: ok(null, '保存成功') }
+    }
+    if (method === 'delete') {
+      dbDeleteConfig(params.menuId)
+      return { data: ok(null, '删除成功') }
+    }
+  }
+
+  if (url === '/table/export') {
+    if (method === 'get') {
+      const dataset = resolveDataset(params.menuId)
+      const { list } = queryList(dataset, {
+        filters: params.filters,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
+        page: 1,
+        pageSize: dataset.length
       })
-    }, 300)
-  })
+      const blob = buildCsvBlob(list, params.fields || [])
+      const fileName = resolveExportFileName(params.menuId)
+      return {
+        data: blob,
+        headers: { 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}` }
+      }
+    }
+  }
+
+  const error = new Error(`接口不存在: ${method.toUpperCase()} ${url}`)
+  error.status = 404
+  throw error
+}
+
+// ============================================================
+// axios 实例：自定义 adapter 拦截请求，模拟真实 HTTP 调用
+// ============================================================
+const mockHttp = axios.create({ baseURL: '/api' })
+
+mockHttp.defaults.adapter = async config => {
+  const start = Date.now()
+  await new Promise(resolve => setTimeout(resolve, NETWORK_LATENCY()))
+  let response
+  try {
+    response = handleApi(config)
+    serverLog(config.method || 'get', config.url, response.status || 200, Date.now() - start)
+    return {
+      data: response.data,
+      status: response.status || 200,
+      statusText: 'OK',
+      headers: response.headers || {},
+      config,
+      request: {}
+    }
+  } catch (e) {
+    serverLog(config.method || 'get', config.url, e.status || 500, Date.now() - start)
+    throw e
+  }
+}
+
+// ============================================================
+// 提供给页面的接口函数（与真实后端接入方式一致）
+// ============================================================
+
+/** 查询列表数据：GET /api/table/data */
+export function fetchTableData(params) {
+  return mockHttp.get('/table/data', { params })
+}
+
+/** 查询表格配置：GET /api/table/config */
+export function fetchTableConfig(menuId) {
+  return mockHttp.get('/table/config', { params: { menuId } })
+}
+
+/** 保存表格配置：POST /api/table/config */
+export function saveTableConfig(config) {
+  return mockHttp.post('/table/config', config)
+}
+
+/** 删除表格配置：DELETE /api/table/config */
+export function deleteTableConfig(menuId) {
+  return mockHttp.delete('/table/config', { params: { menuId } })
+}
+
+/** 导出数据：GET /api/table/export（Blob 响应） */
+export function exportTableData(params) {
+  return mockHttp.get('/table/export', { params, responseType: 'blob' })
 }

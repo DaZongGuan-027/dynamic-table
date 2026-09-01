@@ -218,7 +218,7 @@ export default {
     },
 
     _buildConfig() {
-      return {
+      const config = {
         version: 2,
         menuId: this.menuId,
 
@@ -235,6 +235,11 @@ export default {
           showUniversalFilter: this.configuredShowUniversalFilter
         })
       }
+      // 兼容旧版后端字段白名单：同时写入顶层 pageSizes，读取时 settings 优先
+      if (this.configuredPageSizes && this.configuredPageSizes.length > 0) {
+        config.pageSizes = JSON.stringify(this.configuredPageSizes)
+      }
+      return config
     },
 
     handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, showSummary, showUniversalFilter }) {
