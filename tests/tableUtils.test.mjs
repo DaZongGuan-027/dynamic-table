@@ -5,6 +5,7 @@ import {
   buildExportFields,
   getMinimumPageSize,
   hasActiveFilterValue,
+  isTextOverflowing,
   isAbortError,
   isCachedFilterValueValid,
   normalizeTableResponse,
@@ -87,6 +88,12 @@ test('recognizes browser and Axios cancellation errors', () => {
   assert.equal(isAbortError({ name: 'AbortError' }), true)
   assert.equal(isAbortError({ code: 'ERR_CANCELED' }), true)
   assert.equal(isAbortError(new Error('failed')), false)
+})
+
+test('detects text overflow from the rendered element dimensions', () => {
+  assert.equal(isTextOverflowing({ scrollWidth: 81, clientWidth: 80 }), true)
+  assert.equal(isTextOverflowing({ scrollWidth: 80, clientWidth: 80 }), false)
+  assert.equal(isTextOverflowing(null), false)
 })
 
 test('normalizes the in operator consistently for every filter entry point', () => {

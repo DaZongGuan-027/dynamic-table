@@ -134,6 +134,10 @@ export function hasActiveFilterValue(value) {
   return true
 }
 
+export function isTextOverflowing(element) {
+  return Boolean(element && element.scrollWidth > element.clientWidth)
+}
+
 export function getSelectionKey(row, rowKey) {
   const value = row && row[rowKey]
   return typeof value + ':' + String(value)

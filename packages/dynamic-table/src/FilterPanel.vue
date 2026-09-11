@@ -23,10 +23,14 @@
             >
               <el-tooltip
                 :content="meta.fieldLabel"
+                :disabled="!filterLabelOverflow[meta.fieldKey]"
                 placement="top"
                 :open-delay="0"
               >
-                <div class="filter-label">{{ meta.fieldLabel }}</div>
+                <div
+                  class="filter-label"
+                  @mouseenter="updateFilterLabelOverflow(meta.fieldKey, $event)"
+                >{{ meta.fieldLabel }}</div>
               </el-tooltip>
               <div class="filter-control">
                 <template v-if="hasEnumOptions(meta)">
@@ -406,7 +410,7 @@
 </template>
 
 <script>
-import { hasActiveFilterValue } from './utils/tableUtils.mjs'
+import { hasActiveFilterValue, isTextOverflowing } from './utils/tableUtils.mjs'
 
 export default {
   name: 'FilterPanel',
@@ -426,6 +430,7 @@ export default {
   data() {
     return {
       enumFilterText: {},
+      filterLabelOverflow: {},
       customFilter: {
         fieldKey: '',
         fieldType: '',
@@ -582,6 +587,9 @@ export default {
   methods: {
     isFilterValueActive(value) {
       return hasActiveFilterValue(value)
+    },
+    updateFilterLabelOverflow(fieldKey, event) {
+      this.$set(this.filterLabelOverflow, fieldKey, isTextOverflowing(event.currentTarget))
     },
     hasEnumOptions(meta) {
       return meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
