@@ -204,10 +204,19 @@
       :page-sizes="computedPageSizes"
       :show-summary="computedShowSummary"
       :show-universal-filter="computedShowUniversalFilter"
+      :parameter-values="configuredParameterValues"
 
       @confirm="handleConfigChange"
       @reset-default="handleResetDefault"
-    />
+    >
+      <template v-if="$scopedSlots['parameter-config']" slot="parameter-config" slot-scope="scope">
+        <slot
+          name="parameter-config"
+          :values="scope.values"
+          :set-value="scope.setValue"
+        />
+      </template>
+    </config-drawer>
   </div>
 </template>
 
@@ -265,7 +274,8 @@ export default {
     pageSizeParamName: { type: String, default: 'pageSize' },
     showSummary: { type: Boolean, default: false },
 
-    showUniversalFilter: { type: Boolean, default: true }
+    showUniversalFilter: { type: Boolean, default: true },
+    defaultParameterValues: { type: Object, default: () => ({}) }
   },
 
   data() {
@@ -1039,6 +1049,10 @@ export default {
 
     getTableConfig() {
       return this._buildConfig()
+    },
+
+    getParameterValues() {
+      return JSON.parse(JSON.stringify(this.configuredParameterValues || {}))
     },
 
     async reload() {

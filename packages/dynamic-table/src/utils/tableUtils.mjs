@@ -41,10 +41,12 @@ export function readTableSettings(config, columnWidths = {}) {
   const showUniversalFilter = settings.showUniversalFilter !== undefined
     ? settings.showUniversalFilter
     : columnWidths.__showUniversalFilter
+  const parameterValues = parseJsonObject(settings.parameterValues)
   return {
     pageSizes: Array.isArray(pageSizes) ? pageSizes : null,
     showSummary: typeof showSummary === 'boolean' ? showSummary : undefined,
-    showUniversalFilter: typeof showUniversalFilter === 'boolean' ? showUniversalFilter : undefined
+    showUniversalFilter: typeof showUniversalFilter === 'boolean' ? showUniversalFilter : undefined,
+    parameterValues
   }
 }
 

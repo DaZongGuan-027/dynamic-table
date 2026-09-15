@@ -36,19 +36,30 @@ test('uses the smallest valid page size', () => {
 
 test('reads version 2 settings and migrates legacy column width settings', () => {
   assert.deepEqual(readTableSettings({ settings: '{"pageSizes":[20,50],"showSummary":true}' }), {
-    pageSizes: [20, 50], showSummary: true, showUniversalFilter: undefined
+    pageSizes: [20, 50], showSummary: true, showUniversalFilter: undefined, parameterValues: null
   })
   assert.deepEqual(readTableSettings({}, {
     __pageSizes: [10, 100], __showSummary: false, __showUniversalFilter: true
-  }), { pageSizes: [10, 100], showSummary: false, showUniversalFilter: true })
+  }), { pageSizes: [10, 100], showSummary: false, showUniversalFilter: true, parameterValues: null })
+})
+
+test('reads custom parameter values from settings', () => {
+  assert.deepEqual(readTableSettings({
+    settings: '{"parameterValues":{"dense":true,"rowLimit":200}}'
+  }), {
+    pageSizes: null,
+    showSummary: undefined,
+    showUniversalFilter: undefined,
+    parameterValues: { dense: true, rowLimit: 200 }
+  })
 })
 
 test('migrates legacy top-level pageSizes (v1.1.x) when settings are missing', () => {
   assert.deepEqual(readTableSettings({ pageSizes: '[100,500,1000]' }), {
-    pageSizes: [100, 500, 1000], showSummary: undefined, showUniversalFilter: undefined
+    pageSizes: [100, 500, 1000], showSummary: undefined, showUniversalFilter: undefined, parameterValues: null
   })
   assert.deepEqual(readTableSettings({ pageSizes: [100, 500, 1000] }), {
-    pageSizes: [100, 500, 1000], showSummary: undefined, showUniversalFilter: undefined
+    pageSizes: [100, 500, 1000], showSummary: undefined, showUniversalFilter: undefined, parameterValues: null
   })
 })
 
@@ -56,7 +67,7 @@ test('settings.pageSizes takes precedence over legacy pageSizes fields', () => {
   assert.deepEqual(readTableSettings(
     { settings: '{"pageSizes":[100,500]}', pageSizes: '[10,20]' },
     { __pageSizes: [1, 2] }
-  ), { pageSizes: [100, 500], showSummary: undefined, showUniversalFilter: undefined })
+  ), { pageSizes: [100, 500], showSummary: undefined, showUniversalFilter: undefined, parameterValues: null })
 })
 
 test('rejects malformed configuration field types', () => {
@@ -65,7 +76,7 @@ test('rejects malformed configuration field types', () => {
   assert.deepEqual(parseJsonObject('{"name":120}'), { name: 120 })
   assert.equal(parseJsonObject('["name"]'), null)
   assert.deepEqual(readTableSettings({ settings: '{"pageSizes":"10,50","showSummary":"true"}' }), {
-    pageSizes: null, showSummary: undefined, showUniversalFilter: undefined
+    pageSizes: null, showSummary: undefined, showUniversalFilter: undefined, parameterValues: null
   })
 })
 

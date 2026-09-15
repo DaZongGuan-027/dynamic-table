@@ -209,6 +209,13 @@
             </div>
           </div>
         </div>
+        <div v-if="$scopedSlots['parameter-config']" class="custom-parameter-config">
+          <slot
+            name="parameter-config"
+            :values="editParameterValues"
+            :set-value="setParameterValue"
+          />
+        </div>
       </el-tab-pane>
     </el-tabs>
 
@@ -243,7 +250,8 @@ export default {
     currentFilterValues: { type: Object, default: () => ({}) },
     pageSizes: { type: Array, default: () => [10, 50, 100, 500] },
     showSummary: { type: Boolean, default: false },
-    showUniversalFilter: { type: Boolean, default: true }
+    showUniversalFilter: { type: Boolean, default: true },
+    parameterValues: { type: Object, default: () => ({}) }
   },
 
   data() {
@@ -258,6 +266,7 @@ export default {
       editPageSizes: [],
       editShowSummary: false,
       editShowUniversalFilter: true,
+      editParameterValues: {},
       customPageSizeInput: 50,
       presetPageSizes: [10, 20, 50, 100, 200, 500, 1000, 2000]
     }
@@ -384,6 +393,7 @@ export default {
       this.editPageSizes = [...(this.pageSizes || [10, 50, 100, 500])].sort((a, b) => a - b)
       this.editShowSummary = this.showSummary
       this.editShowUniversalFilter = this.showUniversalFilter
+      this.editParameterValues = JSON.parse(JSON.stringify(this.parameterValues || {}))
 
       this.activeTab = 'column'
     },
@@ -465,6 +475,11 @@ export default {
     removePageSize(opt) {
       const idx = this.editPageSizes.indexOf(opt)
       if (idx >= 0) this.editPageSizes.splice(idx, 1)
+    },
+
+    setParameterValue(key, value) {
+      if (!key) return
+      this.$set(this.editParameterValues, key, value)
     },
 
     removeScheme(index) {
@@ -576,7 +591,8 @@ export default {
         filterSchemes,
         pageSizes: [...this.editPageSizes].sort((a, b) => a - b),
         showSummary: this.editShowSummary,
-        showUniversalFilter: this.editShowUniversalFilter
+        showUniversalFilter: this.editShowUniversalFilter,
+        parameterValues: JSON.parse(JSON.stringify(this.editParameterValues))
       })
       this.drawerVisible = false
     },
@@ -586,7 +602,7 @@ export default {
     },
 
     handleResetDefault() {
-      this.$confirm('确定还原为默认配置？所有自定义配置（表头配置、筛选配置、筛选方案）将被清除，且不可恢复。', '还原默认配置', {
+      this.$confirm('确定还原为默认配置？所有自定义配置（表头配置、筛选配置、筛选方案、参数配置）将被清除，且不可恢复。', '还原默认配置', {
         confirmButtonText: '确定还原',
         cancelButtonText: '取消',
         type: 'warning'
@@ -849,5 +865,10 @@ export default {
 }
 .pagination-config-current {
   margin-top: 4px;
+}
+.custom-parameter-config {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
 }
 </style>

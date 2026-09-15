@@ -176,6 +176,7 @@ export default {
 | defaultFilterFields | Array | 否 | [] | 默认展示的筛选项字段（筛选条件项的初始化值），需为 `filterable` 的字段；用户保存过筛选配置后以用户配置为准 |
 | showSummary | Boolean | 否 | false | 是否显示合计行 |
 | showUniversalFilter | Boolean | 否 | true | 是否显示万能筛选 |
+| defaultParameterValues | Object | 否 | {} | 自定义参数的默认值；与 `parameter-config` 插槽配合使用，用户已保存的同名参数优先 |
 
 ### fieldMetaList 字段定义
 
@@ -300,6 +301,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | config-error | error | 配置加载失败时触发；组件会使用默认展示，但阻止保存以免覆盖服务端配置 |
 | config-save-error | error | 配置保存失败时触发 |
 | config-save-blocked | error | 配置加载失败后尝试保存时触发 |
+| parameter-change | values | 自定义参数加载、保存或还原默认值后触发，参数为完整的自定义参数对象 |
 | export-success | result | 导出文件成功后触发 |
 | export-error | error | 导出失败后触发 |
 | data-error | error | 分页查询失败后触发 |
@@ -314,10 +316,35 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | loading | - | 自定义数据加载状态 |
 | empty | - | 自定义空数据状态 |
 | error | { error, retry } | 自定义加载失败状态，`retry` 可重新请求 |
+| parameter-config | { values, setValue } | 在“参数配置”页签中增加自定义控件；`values` 为当前编辑副本，推荐通过 `setValue(key, value)` 更新 |
 
 ### 实例方法
 
-通过表格组件 `ref` 可调用：`refresh()`、`retry()`、`resetFilters()`、`getFilters()`、`getExportFields()`、`getTableConfig()`、`getSelection()`、`clearSelection()`、`toggleRowSelection(row, selected)`、`doLayout()` 和 `getElTable()`。
+通过表格组件 `ref` 可调用：`refresh()`、`retry()`、`resetFilters()`、`getFilters()`、`getExportFields()`、`getTableConfig()`、`getParameterValues()`、`getSelection()`、`clearSelection()`、`toggleRowSelection(row, selected)`、`doLayout()` 和 `getElTable()`。
+
+### 扩展参数配置
+
+使用 `parameter-config` 插槽可以在“表格配置 → 参数配置”中加入业务参数。参数在用户点击“保存”后写入配置的 `settings.parameterValues`，并通过 `parameter-change` 通知使用方：
+
+```vue
+<dynamic-table
+  ref="dynamicTable"
+  :default-parameter-values="{ dense: false, rowLimit: 100 }"
+  @parameter-change="handleParameterChange"
+>
+  <template slot="parameter-config" slot-scope="{ values, setValue }">
+    <div class="config-switch-row">
+      <span>紧凑模式</span>
+      <el-switch
+        :value="values.dense"
+        @input="setValue('dense', $event)"
+      />
+    </div>
+  </template>
+</dynamic-table>
+```
+
+自定义参数必须是可 JSON 序列化的数据。组件只负责展示编辑入口和持久化，参数的业务效果由使用方在 `parameter-change` 中实现；也可以随时调用 `getParameterValues()` 获取当前生效值。
 
 `getFilters()` 返回的就是下一次列表查询和组件内置导出使用的合并筛选条件。同步、批量处理、业务导出等按钮如果需要沿用表格当前条件，应这样读取：
 
@@ -488,12 +515,12 @@ exportDataFn({ menuId, fields, filters, sortBy, sortOrder }) {
   filterFields: '["username","status"]',
   columnOrder: '["username","age","status"]',
   filterSchemes: '[{"name":"方案1","filterValues":{}}]',
-  settings: '{"pageSizes":[10,50,100,500],"showSummary":true,"showUniversalFilter":true}',
+  settings: '{"pageSizes":[10,50,100,500],"showSummary":true,"showUniversalFilter":true,"parameterValues":{"dense":false}}',
   pageSizes: '[10,50,100,500]'                          // 兼容旧版后端的冗余字段（可选）
 }
 ```
 
-`version: 2` 将分页选项和功能开关独立存入 `settings`。组件仍兼容旧配置：保存在 `columnWidths` 的 `__pageSizes`、`__showSummary`、`__showUniversalFilter`，以及 v1.1.x 顶层 `pageSizes` 字段，读取后自动迁移，后续保存即写为 version 2。为避免后端字段白名单丢弃 `settings` 导致分页参数丢失，保存时除 `settings.pageSizes` 外还会同步写入顶层 `pageSizes`（读取时 `settings` 优先）。
+`version: 2` 将分页选项、功能开关和自定义参数独立存入 `settings`。组件仍兼容旧配置：保存在 `columnWidths` 的 `__pageSizes`、`__showSummary`、`__showUniversalFilter`，以及 v1.1.x 顶层 `pageSizes` 字段，读取后自动迁移，后续保存即写为 version 2。为避免后端字段白名单丢弃 `settings` 导致分页参数丢失，保存时除 `settings.pageSizes` 外还会同步写入顶层 `pageSizes`（读取时 `settings` 优先）。
 
 配置接口同样兼容直接对象、Axios 和 `{ code, data }` 包装。若接口结构不同，可通过 `configResponseAdapter` 转换。配置加载异常会触发 `config-error`，且在重新加载成功前阻止保存；连续保存会按顺序执行，避免旧请求晚返回覆盖新配置。
 

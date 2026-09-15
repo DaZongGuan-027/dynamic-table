@@ -38,6 +38,7 @@ export default {
       configuredPageSizes: null,
       configuredShowSummary: undefined,
       configuredShowUniversalFilter: undefined,
+      configuredParameterValues: {},
       configLoadSequence: 0
     }
   },
@@ -104,12 +105,17 @@ export default {
           this.configuredPageSizes = settings.pageSizes
           this.configuredShowSummary = settings.showSummary
           this.configuredShowUniversalFilter = settings.showUniversalFilter
+          this.configuredParameterValues = {
+            ...(this.defaultParameterValues || {}),
+            ...(settings.parameterValues || {})
+          }
           this.$delete(this.columnWidths, '__defaultPageSize')
           this.$delete(this.columnWidths, '__pageSizes')
           this.$delete(this.columnWidths, '__showSummary')
           this.$delete(this.columnWidths, '__showUniversalFilter')
           this.reconcileConfigWithFields()
           this._initPageSizeFromConfig()
+          this._emitParameterChange()
 
         } else {
           this.config = null
@@ -167,9 +173,11 @@ export default {
       this.configuredPageSizes = null
       this.configuredShowSummary = undefined
       this.configuredShowUniversalFilter = undefined
+      this.configuredParameterValues = JSON.parse(JSON.stringify(this.defaultParameterValues || {}))
       if (this.pageSizes && this.pageSizes.length > 0) {
         this.pageSize = getMinimumPageSize(this.pageSizes, this.pageSize)
       }
+      this._emitParameterChange()
     },
 
     clearStorageConfig() {
@@ -232,7 +240,8 @@ export default {
         settings: JSON.stringify({
           pageSizes: this.configuredPageSizes,
           showSummary: this.configuredShowSummary,
-          showUniversalFilter: this.configuredShowUniversalFilter
+          showUniversalFilter: this.configuredShowUniversalFilter,
+          parameterValues: this.configuredParameterValues
         })
       }
       // 兼容旧版后端字段白名单：同时写入顶层 pageSizes，读取时 settings 优先
@@ -242,7 +251,7 @@ export default {
       return config
     },
 
-    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, showSummary, showUniversalFilter }) {
+    handleConfigChange({ visibleFields, columnOrder, frozenFields, frozenPositions, columnWidths, filterFields, filterSchemes, pageSizes, showSummary, showUniversalFilter, parameterValues }) {
       this.visibleFields = visibleFields
       this.columnOrder = columnOrder
       this.frozenFields = frozenFields
@@ -253,6 +262,8 @@ export default {
       this.configuredPageSizes = pageSizes && pageSizes.length > 0 ? pageSizes : null
       if (showSummary !== undefined) this.configuredShowSummary = showSummary
       if (showUniversalFilter !== undefined) this.configuredShowUniversalFilter = showUniversalFilter
+      this.configuredParameterValues = JSON.parse(JSON.stringify(parameterValues || {}))
+      this._emitParameterChange()
       if (pageSizes && pageSizes.length > 0) {
         this.pageSize = getMinimumPageSize(pageSizes, this.pageSize)
       } else if (this.pageSizes && this.pageSizes.length > 0) {
@@ -264,6 +275,10 @@ export default {
         this.doLayout()
         this.fetchData()
       })
+    },
+
+    _emitParameterChange() {
+      this.$emit('parameter-change', JSON.parse(JSON.stringify(this.configuredParameterValues || {})))
     },
 
     handleApplyScheme(filterValues) {

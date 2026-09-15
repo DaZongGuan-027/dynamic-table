@@ -76,6 +76,7 @@ export interface DynamicTableInstance<Row = Record<string, unknown>> extends Vue
   getFilters(): Record<string, unknown>
   getExportFields(): ExportField[]
   getTableConfig(): Record<string, unknown>
+  getParameterValues(): Record<string, unknown>
   getSelection(): Row[]
   clearSelection(): void
   toggleRowSelection(row: Row, selected?: boolean): void
