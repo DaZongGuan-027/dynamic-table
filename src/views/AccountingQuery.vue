@@ -90,7 +90,6 @@ export default {
           fieldLabel: '科目名称',
           fieldType: 'string',
           filterable: true,
-          filterMultiple: false,
           sortable: true,
           width: 120,
           align: 'left',

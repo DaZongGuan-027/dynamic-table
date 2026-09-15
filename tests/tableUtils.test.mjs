@@ -9,6 +9,8 @@ import {
   isAbortError,
   isCachedFilterValueValid,
   normalizeTableResponse,
+  normalizeEnumOptionsResponse,
+  orderEnumOptionsWithSelected,
   normalizeInFilterValue,
   parseJsonArray,
   parseJsonObject,
@@ -27,6 +29,26 @@ test('unwraps direct, Axios and common API response data', () => {
 test('normalizes invalid table responses safely', () => {
   assert.deepEqual(normalizeTableResponse(null), { list: [], total: 0 })
   assert.deepEqual(normalizeTableResponse({ list: 'bad', total: '3' }), { list: [], total: 3 })
+})
+
+test('normalizes lazy enum option response formats', () => {
+  assert.deepEqual(normalizeEnumOptionsResponse([{ label: '启用', value: 1 }]), [{ label: '启用', value: 1 }])
+  assert.deepEqual(normalizeEnumOptionsResponse({ data: { A: '甲', B: '乙' } }), [
+    { label: '甲', value: 'A' },
+    { label: '乙', value: 'B' }
+  ])
+  assert.deepEqual(normalizeEnumOptionsResponse({ list: [{ value: 1 }] }), [{ label: '1', value: 1 }])
+  assert.throws(() => normalizeEnumOptionsResponse(null), /loadEnumOptions/)
+})
+
+test('pins selected enum options in selection order without mutating the source', () => {
+  const options = [
+    { label: '甲', value: 'A' },
+    { label: '乙', value: 'B' },
+    { label: '丙', value: 'C' }
+  ]
+  assert.deepEqual(orderEnumOptionsWithSelected(options, ['C', 'A']), [options[2], options[0], options[1]])
+  assert.deepEqual(options.map(option => option.value), ['A', 'B', 'C'])
 })
 
 test('uses the smallest valid page size', () => {
@@ -93,6 +115,7 @@ test('rejects incompatible cached filter structures', () => {
   assert.equal(isCachedFilterValueValid({ fieldType: 'date', dateFilterType: 'month', monthToDateRange: true }, { range: null }), true)
   assert.equal(isCachedFilterValueValid({ fieldType: 'date', dateFilterType: 'month', monthToDateRange: true }, { value: '2024-01' }), false)
   assert.equal(isCachedFilterValueValid({ fieldType: 'enum', enumValues: [1], filterMultiple: false }, [1]), false)
+  assert.equal(isCachedFilterValueValid({ fieldType: 'enum', loadEnumOptions() {}, filterMultiple: false }, 'enabled'), true)
 })
 
 test('recognizes browser and Axios cancellation errors', () => {

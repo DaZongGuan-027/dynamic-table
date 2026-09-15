@@ -8,6 +8,19 @@ export interface EnumOption {
   value: string | number | boolean
 }
 
+export interface EnumLoadContext {
+  fieldKey: string
+  keyword: string
+  selectedValues: Array<string | number | boolean>
+  signal?: AbortSignal
+}
+
+export type EnumOptionsResult =
+  | EnumOption[]
+  | Record<string, string>
+  | { list: EnumOption[] }
+  | { data: EnumOption[] | Record<string, string> | { list: EnumOption[] } }
+
 export interface FieldMeta<Row = Record<string, unknown>> {
   fieldKey: string
   fieldLabel: string
@@ -16,6 +29,8 @@ export interface FieldMeta<Row = Record<string, unknown>> {
   sortable?: boolean
   filterMultiple?: boolean
   enumValues?: EnumOption[] | Record<string, string>
+  loadEnumOptions?: (context: EnumLoadContext) => Promise<EnumOptionsResult> | EnumOptionsResult
+  enumRemote?: boolean
   dateFilterType?: 'daterange' | 'monthrange' | 'month' | 'date'
   monthToDateRange?: boolean
   dateFormat?: string
@@ -77,6 +92,8 @@ export interface DynamicTableInstance<Row = Record<string, unknown>> extends Vue
   getExportFields(): ExportField[]
   getTableConfig(): Record<string, unknown>
   getParameterValues(): Record<string, unknown>
+  loadEnumOptions(fieldKey: string, options?: { keyword?: string; selectedValues?: Array<string | number | boolean>; force?: boolean }): Promise<EnumOption[]>
+  reloadEnumOptions(fieldKey?: string): Promise<EnumOption[] | EnumOption[][]>
   getSelection(): Row[]
   clearSelection(): void
   toggleRowSelection(row: Row, selected?: boolean): void

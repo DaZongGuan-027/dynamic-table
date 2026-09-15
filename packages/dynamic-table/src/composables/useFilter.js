@@ -65,7 +65,7 @@ export default {
     initFilterValues(applyDefaults) {
       const values = {}
       this.activeFilterMetaList.forEach(meta => {
-        const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
+        const hasEnum = typeof meta.loadEnumOptions === 'function' || meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
         if (hasEnum) {
           values[meta.fieldKey] = meta.filterMultiple === false ? '' : []
         } else {

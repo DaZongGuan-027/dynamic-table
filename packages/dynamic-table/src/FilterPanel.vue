@@ -33,14 +33,14 @@
                 >{{ meta.fieldLabel }}</div>
               </el-tooltip>
               <div class="filter-control">
-                <template v-if="hasEnumOptions(meta)">
+                <template v-if="usesEnumSelect(meta)">
                   <div class="compare-input">
                     <el-input
                       v-model="enumFilterText[meta.fieldKey]"
                       placeholder="过滤"
                       clearable
                       style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
-                      @input="handleEnumFilterInput(meta.fieldKey, meta.enumValues)"
+                      @input="handleEnumFilterInput(meta.fieldKey, meta)"
                       @keyup.enter.native="$emit('apply')"
                     />
                     <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
@@ -50,20 +50,29 @@
                         :multiple="isEnumMultiple(meta)"
                         clearable
                         class="enum-count-select"
+                        :loading="isEnumLoading(meta.fieldKey)"
+                        loading-text="正在加载选项..."
                         :popper-append-to-body="popperAppendToBody"
                         style="width: 100%"
+                        @visible-change="handleEnumVisibleChange(meta, $event)"
                       >
                         <el-option
-                          v-if="isEnumMultiple(meta) && getFilteredEnumOptions(meta.fieldKey, meta.enumValues).length > 1"
+                          v-if="isEnumMultiple(meta) && getFilteredEnumOptions(meta.fieldKey, getEnumOptions(meta)).length > 1"
                           label="全选"
                           value="__all__"
                           @click.native="handleSelectAll(meta, $event)"
                         />
                         <el-option
-                          v-for="opt in getFilteredEnumOptions(meta.fieldKey, meta.enumValues)"
+                          v-for="opt in getFilteredEnumOptions(meta.fieldKey, getEnumOptions(meta))"
                           :key="opt.value"
                           :label="opt.label"
                           :value="opt.value"
+                        />
+                        <el-option
+                          v-if="getEnumLoadError(meta.fieldKey) && !isEnumLoading(meta.fieldKey)"
+                          label="加载失败，请重新打开重试"
+                          value="__enum_load_error__"
+                          disabled
                         />
                       </el-select>
                       <span
@@ -74,7 +83,7 @@
                   </div>
                 </template>
 
-                <template v-else-if="meta.fieldType === 'string' || (meta.fieldType === 'enum' && !hasEnumOptions(meta))">
+                <template v-else-if="meta.fieldType === 'string' || (meta.fieldType === 'enum' && !usesEnumSelect(meta))">
                   <div class="compare-input">
                     <el-select
                       v-model="filterValues[meta.fieldKey].operator"
@@ -224,7 +233,7 @@
                     clearable
                     size="small"
                     style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
-                    @input="handleEnumFilterInput('__custom__', customFilter.enumOptions)"
+                    @input="handleEnumFilterInput('__custom__', getCustomEnumMeta())"
                   />
                   <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
                     <el-select
@@ -233,21 +242,30 @@
                       :multiple="customFilter.multiple"
                       clearable
                       class="enum-count-select"
+                      :loading="isEnumLoading(customFilter.fieldKey)"
+                      loading-text="正在加载选项..."
                       size="small"
                       :popper-append-to-body="popperAppendToBody"
                       style="width: 100%"
+                      @visible-change="handleCustomEnumVisibleChange"
                     >
                       <el-option
-                        v-if="customFilter.multiple && getFilteredEnumOptions('__custom__', customFilter.enumOptions).length > 1"
+                        v-if="customFilter.multiple && getFilteredEnumOptions('__custom__', getCustomEnumOptions()).length > 1"
                         label="全选"
                         value="__all__"
                         @click.native="handleCustomSelectAll($event)"
                       />
                       <el-option
-                        v-for="opt in getFilteredEnumOptions('__custom__', customFilter.enumOptions)"
+                        v-for="opt in getFilteredEnumOptions('__custom__', getCustomEnumOptions())"
                         :key="opt.value"
                         :label="opt.label"
                         :value="opt.value"
+                      />
+                      <el-option
+                        v-if="getEnumLoadError(customFilter.fieldKey) && !isEnumLoading(customFilter.fieldKey)"
+                        label="加载失败，请重新打开重试"
+                        value="__enum_load_error__"
+                        disabled
                       />
                     </el-select>
                     <span
@@ -410,7 +428,7 @@
 </template>
 
 <script>
-import { hasActiveFilterValue, isTextOverflowing } from './utils/tableUtils.mjs'
+import { hasActiveFilterValue, isTextOverflowing, orderEnumOptionsWithSelected } from './utils/tableUtils.mjs'
 
 export default {
   name: 'FilterPanel',
@@ -424,12 +442,17 @@ export default {
     externalFilterValues: { type: Object, default: () => ({}) },
     activeSchemeIndex: { type: Number, default: -1 },
     popperAppendToBody: { type: Boolean, default: true },
-    showUniversalFilter: { type: Boolean, default: true }
+    showUniversalFilter: { type: Boolean, default: true },
+    enumOptionsMap: { type: Object, default: () => ({}) },
+    enumLoadingMap: { type: Object, default: () => ({}) },
+    enumErrorMap: { type: Object, default: () => ({}) }
   },
 
   data() {
     return {
       enumFilterText: {},
+      enumOpenSelections: {},
+      enumSelectedOptionCache: {},
       filterLabelOverflow: {},
       customFilter: {
         fieldKey: '',
@@ -591,8 +614,72 @@ export default {
     updateFilterLabelOverflow(fieldKey, event) {
       this.$set(this.filterLabelOverflow, fieldKey, isTextOverflowing(event.currentTarget))
     },
-    hasEnumOptions(meta) {
-      return meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
+    usesEnumSelect(meta) {
+      return !!meta && (typeof meta.loadEnumOptions === 'function' || this.normalizeEnumValues(meta.enumValues).length > 0)
+    },
+    getRawEnumOptions(meta) {
+      if (!meta) return []
+      if (Object.prototype.hasOwnProperty.call(this.enumOptionsMap, meta.fieldKey)) {
+        return this.enumOptionsMap[meta.fieldKey] || []
+      }
+      return this.normalizeEnumValues(meta.enumValues)
+    },
+    getEnumOptions(meta, cacheKey, selectedValues) {
+      if (!meta) return []
+      const key = cacheKey || meta.fieldKey
+      const selected = selectedValues === undefined ? this.filterValues[meta.fieldKey] : selectedValues
+      const selectedList = Array.isArray(selected) ? selected : (selected !== '' && selected !== null && selected !== undefined ? [selected] : [])
+      const selectedSet = new Set(selectedList)
+      const cached = (this.enumSelectedOptionCache[key] || []).filter(option => selectedSet.has(option.value))
+      const raw = this.getRawEnumOptions(meta)
+      const cachedValues = new Set(cached.map(option => option.value))
+      return cached.concat(raw.filter(option => !cachedValues.has(option.value)))
+    },
+    rememberSelectedEnumOptions(meta, cacheKey, selectedValues) {
+      if (!meta) return
+      const selected = Array.isArray(selectedValues)
+        ? selectedValues
+        : (selectedValues !== '' && selectedValues !== null && selectedValues !== undefined ? [selectedValues] : [])
+      if (selected.length === 0) return
+      const selectedSet = new Set(selected)
+      const current = this.getEnumOptions(meta, cacheKey, selectedValues)
+      this.$set(this.enumSelectedOptionCache, cacheKey, current.filter(option => selectedSet.has(option.value)))
+    },
+    isEnumLoading(fieldKey) {
+      return !!this.enumLoadingMap[fieldKey]
+    },
+    getEnumLoadError(fieldKey) {
+      return this.enumErrorMap[fieldKey]
+    },
+    handleEnumVisibleChange(meta, visible) {
+      if (!meta) return
+      const selected = this.filterValues[meta.fieldKey]
+      if (visible) {
+        if (this.isEnumMultiple(meta)) {
+          this.$set(this.enumOpenSelections, meta.fieldKey, Array.isArray(selected) ? [...selected] : [])
+        }
+        this.rememberSelectedEnumOptions(meta, meta.fieldKey, selected)
+      } else {
+        this.$delete(this.enumOpenSelections, meta.fieldKey)
+      }
+      if (visible && typeof meta.loadEnumOptions === 'function') {
+        this.$emit('request-enum-options', { meta, keyword: this.enumFilterText[meta.fieldKey] || '', selectedValues: selected })
+      }
+    },
+    handleCustomEnumVisibleChange(visible) {
+      const meta = this.getCustomEnumMeta()
+      if (!meta) return
+      if (visible) {
+        if (this.isEnumMultiple(meta)) {
+          this.$set(this.enumOpenSelections, '__custom__', Array.isArray(this.customFilter.value) ? [...this.customFilter.value] : [])
+        }
+        this.rememberSelectedEnumOptions(meta, '__custom__', this.customFilter.value)
+      } else {
+        this.$delete(this.enumOpenSelections, '__custom__')
+      }
+      if (visible && typeof meta.loadEnumOptions === 'function') {
+        this.$emit('request-enum-options', { meta, keyword: this.enumFilterText.__custom__ || '', selectedValues: this.customFilter.value })
+      }
     },
     isEnumMultiple(meta) {
       return !meta || meta.filterMultiple !== false
@@ -645,16 +732,21 @@ export default {
     getFilteredEnumOptions(fieldKey, enumValues) {
       const all = this.normalizeEnumValues(enumValues)
       const q = (this.enumFilterText[fieldKey] || '').toLowerCase()
-      if (!q) return all
+      if (!q) return orderEnumOptionsWithSelected(all, this.enumOpenSelections[fieldKey])
       return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
     },
 
-    handleEnumFilterInput() {
+    handleEnumFilterInput(fieldKey, meta) {
       this._saveEnumFilterText()
+      if (meta && meta.enumRemote === true && typeof meta.loadEnumOptions === 'function') {
+        const selected = fieldKey === '__custom__' ? this.customFilter.value : this.filterValues[meta.fieldKey]
+        this.rememberSelectedEnumOptions(meta, fieldKey, selected)
+        this.$emit('search-enum-options', { meta, keyword: this.enumFilterText[fieldKey] || '', selectedValues: selected })
+      }
     },
     handleSelectAll(meta, e) {
       e.stopPropagation()
-      const filtered = this.getFilteredEnumOptions(meta.fieldKey, meta.enumValues)
+      const filtered = this.getFilteredEnumOptions(meta.fieldKey, this.getEnumOptions(meta))
       const filteredValues = filtered.map(o => o.value)
       const current = this.filterValues[meta.fieldKey] || []
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
@@ -675,8 +767,8 @@ export default {
       cf.fieldType = meta.fieldType || 'string'
       cf.dateFilterType = this.getDateFilterType(meta)
       cf.monthToDateRange = meta.monthToDateRange === true
-      const enumOpts = this.normalizeEnumValues(meta.enumValues)
-      cf.hasEnum = enumOpts.length > 0
+      const enumOpts = this.getEnumOptions(meta)
+      cf.hasEnum = this.usesEnumSelect(meta)
       cf.multiple = this.isEnumMultiple(meta)
       cf.enumOptions = enumOpts
       this.$set(this.enumFilterText, '__custom__', '')
@@ -699,11 +791,17 @@ export default {
     },
     handleCustomSelectAll(e) {
       e.stopPropagation()
-      const filtered = this.getFilteredEnumOptions('__custom__', this.customFilter.enumOptions)
+      const filtered = this.getFilteredEnumOptions('__custom__', this.getCustomEnumOptions())
       const filteredValues = filtered.map(o => o.value)
       const current = this.customFilter.value || []
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
       this.customFilter.value = isAllSelected ? [] : [...filteredValues]
+    },
+    getCustomEnumMeta() {
+      return this.allDataFields.find(f => f.fieldKey === this.customFilter.fieldKey)
+    },
+    getCustomEnumOptions() {
+      return this.getEnumOptions(this.getCustomEnumMeta(), '__custom__', this.customFilter.value)
     },
     handleCustomNumberInput() {
       const cf = this.customFilter
@@ -742,6 +840,8 @@ export default {
       }
     },
     resetCustomFilters() {
+      this.$delete(this.enumOpenSelections, '__custom__')
+      this.$delete(this.enumSelectedOptionCache, '__custom__')
       this.customFilter = {
         fieldKey: '',
         fieldType: '',

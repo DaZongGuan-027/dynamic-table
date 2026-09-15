@@ -22,6 +22,30 @@ export function normalizeTableResponse(response) {
   }
 }
 
+export function normalizeEnumOptionsResponse(response) {
+  const value = unwrapResponseData(response)
+  const options = value && !Array.isArray(value) && Array.isArray(value.list) ? value.list : value
+  if (Array.isArray(options)) {
+    return options
+      .filter(option => option && typeof option === 'object' && option.value !== undefined)
+      .map(option => ({ label: option.label !== undefined ? option.label : String(option.value), value: option.value }))
+  }
+  if (options && typeof options === 'object') {
+    return Object.keys(options).map(key => ({ label: options[key], value: key }))
+  }
+  throw new Error('loadEnumOptions 必须返回选项数组、选项 Map 或包含 list/data 的响应')
+}
+
+export function orderEnumOptionsWithSelected(options, selectedValues) {
+  if (!Array.isArray(options) || !Array.isArray(selectedValues) || selectedValues.length === 0) {
+    return Array.isArray(options) ? options : []
+  }
+  const optionMap = new Map(options.map(option => [option.value, option]))
+  const selectedOptions = selectedValues.map(value => optionMap.get(value)).filter(Boolean)
+  const selectedSet = new Set(selectedOptions.map(option => option.value))
+  return selectedOptions.concat(options.filter(option => !selectedSet.has(option.value)))
+}
+
 export function getMinimumPageSize(pageSizes, fallback = 10) {
   const values = Array.isArray(pageSizes)
     ? pageSizes.map(Number).filter(value => Number.isFinite(value) && value > 0)
@@ -84,7 +108,7 @@ export function buildDateRangeFilter(meta, range) {
 
 export function isCachedFilterValueValid(meta, cachedValue) {
   if (!meta) return false
-  const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues)
+  const hasEnum = typeof meta.loadEnumOptions === 'function' || meta.enumValues && (Array.isArray(meta.enumValues)
     ? meta.enumValues.length > 0
     : Object.keys(meta.enumValues).length > 0)
   if (hasEnum) {

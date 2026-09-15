@@ -198,6 +198,8 @@ export default {
 | exportFormat | String | 否 | 传给后端的导出格式标识，例如日期或金额格式 |
 | align | String | 否 | 对齐方式：`left` / `center` / `right` |
 | enumValues | Array/Object | 否 | 枚举值，支持数组 `[{ label, value }]` 或 Map `{ '001': '技术部' }` |
+| loadEnumOptions | Function | 否 | 枚举选项懒加载函数，首次打开下拉框时调用，接收 `{ fieldKey, keyword, selectedValues, signal }`；返回格式见下文 |
+| enumRemote | Boolean | 否 | 默认 `false`；配合 `loadEnumOptions` 使用，开启后在“过滤”框输入内容会以 300ms 防抖重新请求远程选项 |
 | filterMultiple | Boolean | 否 | 枚举下拉是否允许多选，默认 `true`；设为 `false` 时筛选面板、表头筛选和万能筛选均为单选 |
 | frozenPosition | String | 否 | 冻结方向提示：`'left'` / `'right'`；列是否冻结仍由表格配置及已保存的 `frozenFields` 决定 |
 | dateFilterType | String | 否 | 日期筛选类型：`daterange`（默认）/ `monthrange` / `month` / `date` |
@@ -254,7 +256,7 @@ export default {
 | string | 文本，筛选时为操作符下拉+输入框，默认"包含" |
 | number | 数值，筛选时为操作符下拉+输入框，默认"等于" |
 | currency | 金额，自动千分位格式化并保留两位小数，筛选同 number |
-| enum | 枚举，筛选时为过滤输入框+下拉选择；默认多选（含全选），配置 `filterMultiple: false` 后为单选。下拉框不支持输入，仅通过过滤框筛选选项，列展示自动显示 label；若未配置 `enumValues` 或选项为空，筛选/表头搜索自动退化为字符串输入框 |
+| enum | 枚举，筛选时为过滤输入框+下拉选择；默认多选（含全选），配置 `filterMultiple: false` 后为单选。支持静态 `enumValues` 或懒加载 `loadEnumOptions`；两者都未配置时才退化为字符串输入框 |
 | date | 日期，筛选类型由 `dateFilterType` 控制，展示格式由 `dateFormat` 控制 |
 | boolean | 布尔，筛选时为是/否下拉 |
 
@@ -271,6 +273,64 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 ```
 
 非 enum 类型字段配置了 enumValues 后，筛选面板和表头搜索也会自动使用下拉选择，列展示会自动做编码→名称映射。
+
+多选下拉框再次打开时，会按“全选 → 已选项 → 其他选项”的顺序展示，已选项按照用户的选择顺序置顶。为避免连续选择时列表跳动，该顺序只在每次打开下拉框时确定一次；下拉框保持打开期间不会因为继续勾选而重新排序。输入过滤关键词后以匹配结果顺序为准，不强行插入不匹配的已选项。单选下拉框始终保持原始选项顺序。
+
+### 枚举下拉懒加载
+
+当枚举数据量较大或必须从接口获取时，配置 `loadEnumOptions`。用户点击下拉框后，面板会立即打开并在内部显示“正在加载选项...”；加载成功后展示选项。首次成功加载的结果会在筛选面板、表头搜索和万能筛选之间共享并缓存，加载失败时下拉框会提示失败，关闭后重新打开即可重试。
+
+```js
+const fieldMetaList = [
+  {
+    fieldKey: 'departmentId',
+    fieldLabel: '部门',
+    fieldType: 'enum',
+    filterable: true,
+    filterMultiple: false,
+    async loadEnumOptions({ keyword, selectedValues, signal }) {
+      const response = await queryDepartments({ keyword, selectedValues }, { signal })
+      return response.data.map(item => ({
+        label: item.departmentName,
+        value: item.departmentId
+      }))
+    }
+  }
+]
+```
+
+加载函数支持以下返回格式：
+
+```js
+[{ label: '技术部', value: '001' }]
+{ '001': '技术部', '002': '市场部' }
+{ list: [{ label: '技术部', value: '001' }] }
+{ data: [{ label: '技术部', value: '001' }] }
+```
+
+需要根据关键词请求服务端时设置 `enumRemote: true`。组件会把过滤框内容作为 `keyword` 传入，并自动进行 300ms 防抖；新请求发出时会取消该字段尚未结束的旧请求：
+
+```js
+{
+  fieldKey: 'userId',
+  fieldLabel: '用户',
+  fieldType: 'enum',
+  filterable: true,
+  enumRemote: true,
+  loadEnumOptions: ({ keyword, selectedValues, signal }) =>
+    searchUsers({ keyword, selectedValues }, { signal }).then(response =>
+      response.data.list.map(user => ({ label: user.name, value: user.id }))
+    )
+}
+```
+
+`selectedValues` 是当前入口已经选中的值数组。远程接口按关键词查询时，建议同时返回这些值对应的选项，组件也会缓存已经加载过的已选项，避免新搜索结果替换后丢失名称。`signal` 是可选的 `AbortSignal`，建议传给 Axios/fetch 以取消过期请求；不使用取消能力时可以忽略它。业务数据发生变化后，可以清除缓存并重新加载：
+
+```js
+await this.$refs.dynamicTable.reloadEnumOptions('departmentId')
+```
+
+不传字段名会重新加载所有配置了 `loadEnumOptions` 的字段。加载成功触发 `enum-options-loaded`，参数为 `{ fieldKey, options }`；失败触发 `enum-load-error`，参数为 `{ fieldKey, error }`。
 
 ### 日期筛选格式
 
@@ -302,6 +362,8 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 | config-save-error | error | 配置保存失败时触发 |
 | config-save-blocked | error | 配置加载失败后尝试保存时触发 |
 | parameter-change | values | 自定义参数加载、保存或还原默认值后触发，参数为完整的自定义参数对象 |
+| enum-options-loaded | { fieldKey, options } | 懒加载枚举选项成功后触发 |
+| enum-load-error | { fieldKey, error } | 懒加载枚举选项失败后触发；下拉框中同时显示失败提示 |
 | export-success | result | 导出文件成功后触发 |
 | export-error | error | 导出失败后触发 |
 | data-error | error | 分页查询失败后触发 |
@@ -320,7 +382,7 @@ enumValues: { '001': '技术部', '002': '市场部', '003': '人事部' }
 
 ### 实例方法
 
-通过表格组件 `ref` 可调用：`refresh()`、`retry()`、`resetFilters()`、`getFilters()`、`getExportFields()`、`getTableConfig()`、`getParameterValues()`、`getSelection()`、`clearSelection()`、`toggleRowSelection(row, selected)`、`doLayout()` 和 `getElTable()`。
+通过表格组件 `ref` 可调用：`refresh()`、`retry()`、`resetFilters()`、`getFilters()`、`getExportFields()`、`getTableConfig()`、`getParameterValues()`、`loadEnumOptions(fieldKey, options)`、`reloadEnumOptions(fieldKey)`、`getSelection()`、`clearSelection()`、`toggleRowSelection(row, selected)`、`doLayout()` 和 `getElTable()`。
 
 ### 扩展参数配置
 

@@ -13,12 +13,17 @@
       :active-scheme-index="activeSchemeIndex"
       :popper-append-to-body="filterPopperAppendToBody"
       :show-universal-filter="computedShowUniversalFilter"
+      :enum-options-map="enumOptionsMap"
+      :enum-loading-map="enumLoadingMap"
+      :enum-error-map="enumErrorMap"
       @toggle-expand="toggleFilterExpand"
       @apply="applyFilters"
       @reset="resetFilters"
       @apply-scheme="handleApplyScheme"
       @save-scheme="handleSaveScheme"
       @save-enum-filter-text="handleSaveEnumFilterText"
+      @request-enum-options="handleEnumOptionsRequest"
+      @search-enum-options="handleEnumOptionsSearch"
     />
 
     <div class="table-toolbar">
@@ -147,10 +152,15 @@
               :column-search-value="columnSearchValues[fieldKey]"
               :current-sort-order="currentSortBy === fieldKey ? currentSortOrder : ''"
               :popper-append-to-body="filterPopperAppendToBody"
+              :enum-options="getEnumOptionsForField(fieldMetaMap[fieldKey])"
+              :enum-loading="isEnumOptionsLoading(fieldKey)"
+              :enum-load-error="enumErrorMap[fieldKey] || null"
               @sort-change="handleColumnSortChange"
               @search-change="handleColumnSearchChange"
               @search-confirm="handleColumnSearchConfirm"
               @search-clear="handleColumnSearchClear"
+              @request-enum-options="handleEnumOptionsRequest"
+              @search-enum-options="handleEnumOptionsSearch"
             />
           </template>
           <template slot-scope="scope">
@@ -233,6 +243,7 @@ import {
   hasActiveFilterValue,
   isAbortError,
   normalizeInFilterValue,
+  normalizeEnumOptionsResponse,
   normalizeTableResponse,
   reconcileReservedSelection
 } from './utils/tableUtils.mjs'
@@ -302,7 +313,14 @@ export default {
       columnSearchValues: {},
       activeSchemeIndex: -1,
       lastCustomFilterValues: {},
-      fetchSequence: 0
+      fetchSequence: 0,
+      enumOptionsMap: {},
+      enumLoadingMap: {},
+      enumLoadedMap: {},
+      enumErrorMap: {},
+      enumLoadSequences: {},
+      enumRequestControllers: {},
+      enumSearchTimers: {}
     }
   },
 
@@ -508,6 +526,11 @@ export default {
 
   beforeDestroy() {
     if (this.requestController) this.requestController.abort()
+    Object.keys(this.enumRequestControllers).forEach(key => {
+      const controller = this.enumRequestControllers[key]
+      if (controller) controller.abort()
+    })
+    Object.keys(this.enumSearchTimers).forEach(key => clearTimeout(this.enumSearchTimers[key]))
   },
 
   methods: {
@@ -693,7 +716,7 @@ export default {
       if (!meta) return value
       if (value === null || value === undefined || value === '') return ''
       let formattedValue = value
-      const enumList = this._normalizeEnumValues(meta.enumValues)
+      const enumList = this.getEnumOptionsForField(meta)
       if (enumList.length > 0) {
         const found = enumList.find(v => String(v.value) === String(value))
         if (found) formattedValue = found.label
@@ -770,6 +793,112 @@ export default {
         return Object.keys(enumValues).map(key => ({ label: enumValues[key], value: key }))
       }
       return []
+    },
+
+    getEnumOptionsForField(meta) {
+      if (!meta) return []
+      if (Object.prototype.hasOwnProperty.call(this.enumOptionsMap, meta.fieldKey)) {
+        return this.enumOptionsMap[meta.fieldKey] || []
+      }
+      return this._normalizeEnumValues(meta.enumValues)
+    },
+
+    isEnumOptionsLoading(fieldKey) {
+      return !!this.enumLoadingMap[fieldKey]
+    },
+
+    handleEnumOptionsRequest({ meta, keyword = '', selectedValues = [] }) {
+      return this.loadEnumOptions(meta, { keyword, selectedValues })
+    },
+
+    handleEnumOptionsSearch({ meta, keyword = '', selectedValues = [] }) {
+      if (!meta || typeof meta.loadEnumOptions !== 'function') return
+      const fieldKey = meta.fieldKey
+      if (this.enumSearchTimers[fieldKey]) clearTimeout(this.enumSearchTimers[fieldKey])
+      this.enumSearchTimers[fieldKey] = setTimeout(() => {
+        this.$delete(this.enumSearchTimers, fieldKey)
+        this.loadEnumOptions(meta, { keyword, selectedValues, force: true })
+      }, 300)
+    },
+
+    async loadEnumOptions(metaOrFieldKey, { keyword = '', selectedValues = [], force = false } = {}) {
+      const meta = typeof metaOrFieldKey === 'string'
+        ? this.fieldMetaMap[metaOrFieldKey]
+        : metaOrFieldKey
+      if (!meta || typeof meta.loadEnumOptions !== 'function') return this.getEnumOptionsForField(meta)
+      const fieldKey = meta.fieldKey
+      if (!force && this.enumLoadingMap[fieldKey]) return this.getEnumOptionsForField(meta)
+      if (!force && this.enumLoadedMap[fieldKey] && !this.enumErrorMap[fieldKey]) {
+        return this.getEnumOptionsForField(meta)
+      }
+
+      const previousController = this.enumRequestControllers[fieldKey]
+      if (previousController) previousController.abort()
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+      const sequence = (this.enumLoadSequences[fieldKey] || 0) + 1
+      this.$set(this.enumLoadSequences, fieldKey, sequence)
+      this.$set(this.enumRequestControllers, fieldKey, controller)
+      this.$set(this.enumLoadingMap, fieldKey, true)
+      this.$delete(this.enumErrorMap, fieldKey)
+
+      try {
+        const response = await meta.loadEnumOptions({
+          fieldKey,
+          keyword,
+          selectedValues: Array.isArray(selectedValues)
+            ? [...selectedValues]
+            : (selectedValues !== '' && selectedValues !== null && selectedValues !== undefined ? [selectedValues] : []),
+          signal: controller ? controller.signal : undefined
+        })
+        if (this.enumLoadSequences[fieldKey] !== sequence) return this.getEnumOptionsForField(meta)
+        const options = normalizeEnumOptionsResponse(response)
+        this.$set(this.enumOptionsMap, fieldKey, options)
+        this.$set(this.enumLoadedMap, fieldKey, true)
+        this.$emit('enum-options-loaded', { fieldKey, options: [...options] })
+        return options
+      } catch (error) {
+        if (this.enumLoadSequences[fieldKey] !== sequence) return this.getEnumOptionsForField(meta)
+        if (error && (error.name === 'AbortError' || error.code === 'ERR_CANCELED')) {
+          return this.getEnumOptionsForField(meta)
+        }
+        this.$set(this.enumErrorMap, fieldKey, error)
+        this.$emit('enum-load-error', { fieldKey, error })
+        return this.getEnumOptionsForField(meta)
+      } finally {
+        if (this.enumLoadSequences[fieldKey] === sequence) {
+          this.$set(this.enumLoadingMap, fieldKey, false)
+          this.$delete(this.enumRequestControllers, fieldKey)
+        }
+      }
+    },
+
+    reloadEnumOptions(fieldKey) {
+      if (fieldKey) {
+        this.$delete(this.enumLoadedMap, fieldKey)
+        this.$delete(this.enumErrorMap, fieldKey)
+        return this.loadEnumOptions(fieldKey, { force: true })
+      }
+      const fields = this.fieldMetaList.filter(meta => typeof meta.loadEnumOptions === 'function')
+      fields.forEach(meta => {
+        this.$delete(this.enumLoadedMap, meta.fieldKey)
+        this.$delete(this.enumErrorMap, meta.fieldKey)
+      })
+      return Promise.all(fields.map(meta => this.loadEnumOptions(meta, { force: true })))
+    },
+
+    resetEnumOptionsCache() {
+      Object.keys(this.enumRequestControllers).forEach(key => {
+        const controller = this.enumRequestControllers[key]
+        if (controller) controller.abort()
+      })
+      Object.keys(this.enumSearchTimers).forEach(key => clearTimeout(this.enumSearchTimers[key]))
+      this.enumOptionsMap = {}
+      this.enumLoadingMap = {}
+      this.enumLoadedMap = {}
+      this.enumErrorMap = {}
+      this.enumLoadSequences = {}
+      this.enumRequestControllers = {}
+      this.enumSearchTimers = {}
     },
 
     normalizeFilterValueForRequest(fieldKey, value) {
@@ -1001,7 +1130,7 @@ export default {
     applySchemeValues(schemeFilterValues) {
       const newValues = {}
       this.activeFilterMetaList.forEach(meta => {
-        const hasEnum = meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
+        const hasEnum = typeof meta.loadEnumOptions === 'function' || meta.enumValues && (Array.isArray(meta.enumValues) ? meta.enumValues.length > 0 : Object.keys(meta.enumValues).length > 0)
         if (schemeFilterValues && schemeFilterValues[meta.fieldKey] !== undefined && this._isCachedValueValid(meta, schemeFilterValues[meta.fieldKey])) {
           newValues[meta.fieldKey] = JSON.parse(JSON.stringify(schemeFilterValues[meta.fieldKey]))
         } else if (hasEnum) {
@@ -1069,6 +1198,7 @@ export default {
       this.columnSearchValues = {}
       this.lastCustomFilterValues = {}
       this.activeSchemeIndex = -1
+      this.resetEnumOptionsCache()
       this.clearSelection()
       this.config = null
       await this.loadConfig()

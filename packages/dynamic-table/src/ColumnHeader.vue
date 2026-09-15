@@ -40,6 +40,7 @@
             placeholder="过滤"
             clearable
             style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
+            @input="handleEnumFilterInput"
           />
           <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
             <el-select
@@ -49,8 +50,11 @@
               :multiple="enumMultiple"
               clearable
               class="enum-count-select"
+              :loading="enumLoading"
+              loading-text="正在加载选项..."
               :popper-append-to-body="popperAppendToBody"
               style="width: 100%"
+              @visible-change="handleEnumVisibleChange"
             >
             <el-option
               v-if="enumMultiple && filteredEnumOptions.length > 1"
@@ -63,6 +67,12 @@
               :key="opt.value"
               :label="opt.label"
               :value="opt.value"
+            />
+            <el-option
+              v-if="enumLoadError && !enumLoading"
+              label="加载失败，请重新打开重试"
+              value="__enum_load_error__"
+              disabled
             />
             </el-select>
             <span
@@ -203,6 +213,8 @@
 </template>
 
 <script>
+import { orderEnumOptionsWithSelected } from './utils/tableUtils.mjs'
+
 export default {
   name: 'ColumnHeader',
 
@@ -211,7 +223,10 @@ export default {
     fieldMeta: { type: Object, required: true },
     columnSearchValue: { type: [String, Number, Boolean, Object, Array], default: '' },
     currentSortOrder: { type: String, default: '' },
-    popperAppendToBody: { type: Boolean, default: true }
+    popperAppendToBody: { type: Boolean, default: true },
+    enumOptions: { type: Array, default: null },
+    enumLoading: { type: Boolean, default: false },
+    enumLoadError: { type: [Error, Object], default: null }
   },
 
   data() {
@@ -220,6 +235,8 @@ export default {
       showSearch: false,
       searchValue: '',
       enumFilterText: '',
+      enumOpenSelection: null,
+      selectedEnumOptionCache: [],
       datePickerOptions: {
         shortcuts: [
           {
@@ -354,7 +371,7 @@ export default {
     filteredEnumOptions() {
       const all = this.normalizedEnumValues
       const q = (this.enumFilterText || '').toLowerCase()
-      if (!q) return all
+      if (!q) return orderEnumOptionsWithSelected(all, this.enumOpenSelection)
       return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
     },
 
@@ -396,7 +413,16 @@ export default {
     },
 
     normalizedEnumValues() {
-      return this._normalizeEnumValues(this.fieldMeta.enumValues)
+      const raw = this.enumOptions !== null
+        ? this.enumOptions
+        : this._normalizeEnumValues(this.fieldMeta.enumValues)
+      const selected = Array.isArray(this.searchValue)
+        ? this.searchValue
+        : (this.searchValue !== '' && this.searchValue !== null && this.searchValue !== undefined ? [this.searchValue] : [])
+      const selectedSet = new Set(selected)
+      const cached = this.selectedEnumOptionCache.filter(option => selectedSet.has(option.value))
+      const cachedValues = new Set(cached.map(option => option.value))
+      return cached.concat(raw.filter(option => !cachedValues.has(option.value)))
     },
 
     enumMultiple() {
@@ -404,7 +430,7 @@ export default {
     },
 
     hasEnumOptions() {
-      return this.normalizedEnumValues.length > 0
+      return typeof this.fieldMeta.loadEnumOptions === 'function' || this.normalizedEnumValues.length > 0
 
 
     }
@@ -441,6 +467,42 @@ export default {
       const current = this.searchValue || []
       const isAllSelected = filteredValues.length > 0 && filteredValues.every(v => current.includes(v))
       this.searchValue = isAllSelected ? [] : [...filteredValues]
+    },
+    handleEnumVisibleChange(visible) {
+      if (visible) {
+        if (this.enumMultiple) {
+          this.enumOpenSelection = Array.isArray(this.searchValue) ? [...this.searchValue] : []
+        }
+        this.rememberSelectedEnumOptions()
+      } else {
+        this.enumOpenSelection = null
+      }
+      if (visible && typeof this.fieldMeta.loadEnumOptions === 'function') {
+        this.$emit('request-enum-options', { meta: this.fieldMeta, keyword: this.enumFilterText || '', selectedValues: this.searchValue })
+      }
+    },
+    handleEnumFilterInput() {
+      if (this.fieldMeta.enumRemote === true && typeof this.fieldMeta.loadEnumOptions === 'function') {
+        this.rememberSelectedEnumOptions()
+        this.$emit('search-enum-options', { meta: this.fieldMeta, keyword: this.enumFilterText || '', selectedValues: this.searchValue })
+      }
+    },
+    rememberSelectedEnumOptions() {
+      const selected = Array.isArray(this.searchValue)
+        ? this.searchValue
+        : (this.searchValue !== '' && this.searchValue !== null && this.searchValue !== undefined ? [this.searchValue] : [])
+      if (selected.length === 0) return
+      const selectedSet = new Set(selected)
+      const raw = this.enumOptions !== null
+        ? this.enumOptions
+        : this._normalizeEnumValues(this.fieldMeta.enumValues)
+      const merged = this.selectedEnumOptionCache.concat(raw)
+      const seen = new Set()
+      this.selectedEnumOptionCache = merged.filter(option => {
+        if (!selectedSet.has(option.value) || seen.has(option.value)) return false
+        seen.add(option.value)
+        return true
+      })
     },
     handlePopoverShow() {
       this.showSearch = this.hasSearchValue
