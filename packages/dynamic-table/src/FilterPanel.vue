@@ -41,7 +41,7 @@
                       clearable
                       style="width: 100px; min-width: 100px; max-width: 100px; flex-shrink: 0"
                       @input="handleEnumFilterInput(meta.fieldKey, meta)"
-                      @keyup.enter.native="$emit('apply')"
+                      @keyup.enter.native="handleApply"
                     />
                     <div class="enum-select-wrapper" style="flex: 1; min-width: 0; position: relative">
                       <el-select
@@ -103,7 +103,7 @@
                       v-model="filterValues[meta.fieldKey].value"
                       :placeholder="'输入' + meta.fieldLabel"
                       clearable
-                      @keyup.enter.native="$emit('apply')"
+                      @keyup.enter.native="handleApply"
                     />
                   </div>
                 </template>
@@ -128,7 +128,7 @@
                       :placeholder="'输入' + meta.fieldLabel"
                       clearable
                       @input="filterValues[meta.fieldKey].value = filterValues[meta.fieldKey].value.replace(/[^\d.-]/g, '').replace(/(\..*)\./g, '$1')"
-                      @keyup.enter.native="$emit('apply')"
+                      @keyup.enter.native="handleApply"
                     />
                   </div>
                 </template>
@@ -375,7 +375,7 @@
                     clearable
                     size="small"
                     @input="handleCustomNumberInput"
-                    @keyup.enter.native="$emit('apply')"
+                    @keyup.enter.native="handleApply"
                     style="flex: 1; min-width: 0"
                   />
                 </div>
@@ -389,6 +389,7 @@
           <el-dropdown
             v-if="filterSchemes && filterSchemes.length > 0"
             trigger="click"
+            :disabled="loading"
             @command="handleSchemeCommand"
             size="small"
           >
@@ -410,15 +411,15 @@
           </el-dropdown>
           <el-button
             size="small"
-            :disabled="!hasActiveFilter"
+            :disabled="loading || !hasActiveFilter"
             @click="handleSaveScheme"
           >
             保存筛选
           </el-button>
-          <el-button type="primary" icon="el-icon-search" size="small" @click="handleApply">
+          <el-button type="primary" icon="el-icon-search" size="small" :loading="loading" @click="handleApply">
             查询
           </el-button>
-          <el-button icon="el-icon-refresh-left" size="small" @click="handleReset">
+          <el-button icon="el-icon-refresh-left" size="small" :loading="loading" @click="handleReset">
             重置
           </el-button>
         </div>
@@ -445,7 +446,8 @@ export default {
     showUniversalFilter: { type: Boolean, default: true },
     enumOptionsMap: { type: Object, default: () => ({}) },
     enumLoadingMap: { type: Object, default: () => ({}) },
-    enumErrorMap: { type: Object, default: () => ({}) }
+    enumErrorMap: { type: Object, default: () => ({}) },
+    loading: { type: Boolean, default: false }
   },
 
   data() {
@@ -854,13 +856,16 @@ export default {
       }
     },
     handleApply() {
+      if (this.loading) return
       this.$emit('apply', this.getCustomFilterValues())
     },
     handleReset() {
+      if (this.loading) return
       this.resetCustomFilters()
       this.$emit('reset')
     },
     handleSchemeCommand(index) {
+      if (this.loading) return
       const scheme = this.filterSchemes[index]
       if (scheme && scheme.filterValues) {
         this.$emit('apply-scheme', { filterValues: scheme.filterValues, index })

@@ -16,6 +16,7 @@
       :enum-options-map="enumOptionsMap"
       :enum-loading-map="enumLoadingMap"
       :enum-error-map="enumErrorMap"
+      :loading="queryLoading"
       @toggle-expand="toggleFilterExpand"
       @apply="applyFilters"
       @reset="resetFilters"
@@ -58,14 +59,7 @@
     </div>
 
     <div class="table-main">
-      <div v-if="dataError" class="table-state table-error-state">
-        <slot name="error" :error="dataError" :retry="retry">
-          <span>数据加载失败</span>
-          <el-button type="text" @click="retry">重试</el-button>
-        </slot>
-      </div>
       <el-table
-        v-else
         ref="elTable"
         :key="tableKey"
         :data="displayData"
@@ -158,7 +152,7 @@
               @sort-change="handleColumnSortChange"
               @search-change="handleColumnSearchChange"
               @search-confirm="handleColumnSearchConfirm"
-              @search-clear="handleColumnSearchClear"
+              @reset="handleColumnReset"
               @request-enum-options="handleEnumOptionsRequest"
               @search-enum-options="handleEnumOptionsSearch"
             />
@@ -194,6 +188,7 @@
         :page-sizes="computedPageSizes"
         :page-size="pageSize"
         :total="total"
+        :disabled="queryLoading"
         layout="total, sizes, prev, pager, next, jumper"
         @size-change="handleSizeChange"
         @current-change="handlePageChange"
@@ -283,6 +278,7 @@ export default {
     filterPopperAppendToBody: { type: Boolean, default: true },
     pageParamName: { type: String, default: 'page' },
     pageSizeParamName: { type: String, default: 'pageSize' },
+    queryDebounceDelay: { type: Number, default: 300 },
     showSummary: { type: Boolean, default: false },
 
     showUniversalFilter: { type: Boolean, default: true },
@@ -294,6 +290,8 @@ export default {
       showConfigDrawer: false,
       tableData: [],
       tableLoading: false,
+      queryDebouncing: false,
+      queryDebounceTimer: null,
       exportLoading: false,
       exportConfirming: false,
       dataError: null,
@@ -301,6 +299,7 @@ export default {
       reservedSelectionMap: {},
       restoringSelection: false,
       requestController: null,
+      activeFetchPromise: null,
       componentReady: false,
       reloadSequence: 0,
       tableKey: 0,
@@ -325,6 +324,10 @@ export default {
   },
 
   computed: {
+    queryLoading() {
+      return this.queryDebouncing || this.tableLoading
+    },
+
     computedTableHeight() {
       if (this.tableHeight) return this.tableHeight
       return '100%'
@@ -525,6 +528,7 @@ export default {
   },
 
   beforeDestroy() {
+    this.clearQueryDebounce()
     if (this.requestController) this.requestController.abort()
     Object.keys(this.enumRequestControllers).forEach(key => {
       const controller = this.enumRequestControllers[key]
@@ -556,53 +560,75 @@ export default {
       return fieldKey === firstKey
     },
 
-    async fetchData() {
+    fetchData() {
+      if (this.tableLoading) return this.activeFetchPromise || Promise.resolve()
       const requestId = ++this.fetchSequence
-      if (this.requestController) this.requestController.abort()
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
       this.requestController = controller
       this.tableLoading = true
       this.dataError = null
-      try {
-        const params = {
-          [this.pageParamName]: this.currentPage,
-          [this.pageSizeParamName]: this.pageSize,
-          filters: this.buildRequestFilters(),
-          sortBy: this.currentSortBy,
-          sortOrder: this.currentSortOrder
-        }
-        const response = await this.fetchDataFn(params, { signal: controller ? controller.signal : undefined })
-        if (requestId !== this.fetchSequence) return
-        const adaptedResult = this.dataResponseAdapter
-          ? this.dataResponseAdapter(response)
-          : normalizeTableResponse(response)
-        const result = adaptedResult || {}
-        this.tableData = Array.isArray(result.list) ? result.list : []
-        this.total = Number.isFinite(Number(result.total)) ? Number(result.total) : 0
+      let fetchPromise
+      fetchPromise = Promise.resolve().then(async () => {
+        try {
+          const params = {
+            [this.pageParamName]: this.currentPage,
+            [this.pageSizeParamName]: this.pageSize,
+            filters: this.buildRequestFilters(),
+            sortBy: this.currentSortBy,
+            sortOrder: this.currentSortOrder
+          }
+          const response = await this.fetchDataFn(params, { signal: controller ? controller.signal : undefined })
+          if (requestId !== this.fetchSequence) return
+          const adaptedResult = this.dataResponseAdapter
+            ? this.dataResponseAdapter(response)
+            : normalizeTableResponse(response)
+          const result = adaptedResult || {}
+          this.tableData = Array.isArray(result.list) ? result.list : []
+          this.total = Number.isFinite(Number(result.total)) ? Number(result.total) : 0
 
-        this.$nextTick(() => {
           this.$nextTick(() => {
-            if (this.$refs.elTable) this.$refs.elTable.doLayout()
-            this.restoreReservedSelection()
+            this.$nextTick(() => {
+              if (this.$refs.elTable) this.$refs.elTable.doLayout()
+              this.restoreReservedSelection()
+            })
           })
-        })
-      } catch (e) {
-        if (requestId !== this.fetchSequence) return
-        if (isAbortError(e)) return
-        console.error('获取表格数据失败:', e)
-        this.tableData = []
-        this.total = 0
-        this.dataError = e
-        this.$emit('data-error', e)
-        if (this.dataErrorHandler) {
-          try { this.dataErrorHandler(e) } catch (handlerError) { console.error('dataErrorHandler 执行失败:', handlerError) }
+        } catch (e) {
+          if (requestId !== this.fetchSequence) return
+          if (isAbortError(e)) return
+          console.error('获取表格数据失败:', e)
+          this.dataError = e
+          this.$emit('data-error', e)
+          if (this.dataErrorHandler) {
+            try { this.dataErrorHandler(e) } catch (handlerError) { console.error('dataErrorHandler 执行失败:', handlerError) }
+          }
+        } finally {
+          if (requestId === this.fetchSequence) {
+            this.tableLoading = false
+            if (this.requestController === controller) this.requestController = null
+            if (this.activeFetchPromise === fetchPromise) this.activeFetchPromise = null
+          }
         }
-      } finally {
-        if (requestId === this.fetchSequence) {
-          this.tableLoading = false
-          if (this.requestController === controller) this.requestController = null
-        }
-      }
+      })
+      this.activeFetchPromise = fetchPromise
+      return fetchPromise
+    },
+
+    scheduleQuery() {
+      if (this.tableLoading) return
+      if (this.queryDebounceTimer) clearTimeout(this.queryDebounceTimer)
+      this.queryDebouncing = true
+      const delay = Math.max(0, Number(this.queryDebounceDelay) || 0)
+      this.queryDebounceTimer = setTimeout(() => {
+        this.queryDebounceTimer = null
+        this.queryDebouncing = false
+        this.fetchData()
+      }, delay)
+    },
+
+    clearQueryDebounce() {
+      if (this.queryDebounceTimer) clearTimeout(this.queryDebounceTimer)
+      this.queryDebounceTimer = null
+      this.queryDebouncing = false
     },
 
     buildRequestFilters() {
@@ -948,12 +974,14 @@ export default {
 
 
     handleSizeChange(size) {
+      if (this.queryLoading) return
       this.pageSize = size
       this.currentPage = 1
       this.fetchData()
     },
 
     handlePageChange(page) {
+      if (this.queryLoading) return
       this.currentPage = page
       this.fetchData()
     },
@@ -1031,13 +1059,15 @@ export default {
     },
 
     applyFilters(customFilterValues) {
+      if (this.tableLoading) return
       this._saveCachedFilters()
       this.lastCustomFilterValues = customFilterValues || {}
       this.currentPage = 1
-      this.fetchData()
+      this.scheduleQuery()
     },
 
     resetFilters() {
+      if (this.queryLoading) return
       this.initFilterValues(false)
       this._clearCachedFilters()
       this.columnSearchValues = {}
@@ -1052,6 +1082,7 @@ export default {
     },
 
     handleApplyScheme({ filterValues, index }) {
+      if (this.queryLoading) return
       this.activeSchemeIndex = index
       this.applySchemeValues(filterValues)
       this.applyColumnSearchFromScheme(filterValues)
@@ -1186,11 +1217,9 @@ export default {
 
     async reload() {
       const reloadId = ++this.reloadSequence
-      this.fetchSequence++
-      if (this.requestController) {
-        this.requestController.abort()
-        this.requestController = null
-      }
+      this.clearQueryDebounce()
+      if (this.activeFetchPromise) await this.activeFetchPromise
+      if (reloadId !== this.reloadSequence) return
       this.dataError = null
       this.currentPage = 1
       this.currentSortBy = ''
@@ -1215,6 +1244,7 @@ export default {
     },
 
     handleColumnSortChange(fieldKey, order) {
+      if (this.queryLoading) return
       this.currentSortBy = order ? fieldKey : ''
       this.currentSortOrder = order
       this.currentPage = 1
@@ -1226,12 +1256,18 @@ export default {
     },
 
     handleColumnSearchConfirm() {
+      if (this.queryLoading) return
       this.currentPage = 1
       this.fetchData()
     },
 
-    handleColumnSearchClear(fieldKey) {
+    handleColumnReset(fieldKey) {
+      if (this.queryLoading) return
       this.$set(this.columnSearchValues, fieldKey, '')
+      if (this.currentSortBy === fieldKey) {
+        this.currentSortBy = ''
+        this.currentSortOrder = ''
+      }
       this.currentPage = 1
       this.fetchData()
     }

@@ -150,7 +150,7 @@ export default {
 | fetchDataFn | Function | 是 | - | 数据查询函数，接收 params 参数，返回 Promise `{ list, total }` |
 | dataResponseAdapter | Function | 否 | null | 自定义列表响应转换函数，将接口响应转换为 `{ list, total }` |
 | exportDataFn | Function | 否 | null | 后端导出函数；接收当前字段、筛选和排序配置，返回 `Blob`、`{ blob, fileName }`、Axios Blob 响应或 `{ downloadUrl, fileName }` |
-| dataErrorHandler | Function | 否 | null | 分页查询失败后的统一错误处理函数 |
+| dataErrorHandler | Function | 否 | null | 分页查询失败后的统一错误处理函数；失败时列表保留上一次成功查询的数据 |
 | exportFileName | String | 否 | '表格数据' | 导出接口未返回文件名时使用的默认文件名 |
 | loadConfigFn | Function | 否 | null | 加载配置函数，接收 menuId，返回 Promise 配置对象 |
 | saveConfigFn | Function | 否 | null | 保存配置函数，接收 config 对象，返回 Promise |
@@ -166,6 +166,7 @@ export default {
 | pageSizes | Array | 否 | [10,50,100,500] | 每页条数选项；当前页面初始展示条数取其中最小值。配置界面允许 1～2000，后端允许的最大值应与业务传入的选项一致 |
 | pageSizeParamName | String | 否 | 'pageSize' | 组件传给 `fetchDataFn` 的分页大小字段名；已有后端字段不同时在此适配 |
 | pageParamName | String | 否 | 'page' | 组件传给 `fetchDataFn` 的页码字段名；已有后端使用 `pageNum` 时配置为 `pageNum` |
+| queryDebounceDelay | Number | 否 | 300 | 点击查询的防抖等待时间（毫秒）；连续触发时只执行最后一次查询 |
 | headerAlign | String | 否 | 'center' | 表头对齐方式，默认居中 |
 | actionColumnWidth | String/Number | 否 | 150 | 操作列默认宽度 |
 | defaultFilterValues | Object | 否 | {} | 筛选条件默认值 |

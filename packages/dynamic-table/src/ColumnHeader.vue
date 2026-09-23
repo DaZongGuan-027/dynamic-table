@@ -578,11 +578,7 @@ export default {
 
 
     handleReset() {
-      this.$emit('search-clear', this.fieldKey)
-      if (this.currentSort) {
-        this.$emit('sort-change', this.fieldKey, '')
-      }
-      this.$emit('search-confirm')
+      this.$emit('reset', this.fieldKey)
       this.popoverVisible = false
     }
   }
