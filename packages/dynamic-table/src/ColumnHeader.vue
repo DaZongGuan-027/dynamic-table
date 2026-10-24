@@ -62,12 +62,7 @@
               value="__all__"
               @click.native="handleEnumSelectAll($event)"
             />
-            <el-option
-              v-for="opt in filteredEnumOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
+            <virtual-enum-options :options="filteredEnumOptions" :enabled="fieldMeta.enumVirtual === undefined ? null : fieldMeta.enumVirtual" :threshold="fieldMeta.enumVirtualThreshold || 100" />
             <el-option
               v-if="enumLoadError && !enumLoading"
               label="加载失败，请重新打开重试"
@@ -214,8 +209,11 @@
 
 <script>
 import { orderEnumOptionsWithSelected } from './utils/tableUtils.mjs'
+import VirtualEnumOptions from './VirtualEnumOptions.vue'
+import { searchEnumOptions } from './utils/enumSearch.js'
 
 export default {
+  components: { VirtualEnumOptions },
   name: 'ColumnHeader',
 
   props: {
@@ -372,7 +370,7 @@ export default {
       const all = this.normalizedEnumValues
       const q = (this.enumFilterText || '').toLowerCase()
       if (!q) return orderEnumOptionsWithSelected(all, this.enumOpenSelection)
-      return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
+      return searchEnumOptions(all, q)
     },
 
     currentSort() {

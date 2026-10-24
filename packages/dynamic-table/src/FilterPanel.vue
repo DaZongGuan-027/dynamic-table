@@ -62,12 +62,7 @@
                           value="__all__"
                           @click.native="handleSelectAll(meta, $event)"
                         />
-                        <el-option
-                          v-for="opt in getFilteredEnumOptions(meta.fieldKey, getEnumOptions(meta))"
-                          :key="opt.value"
-                          :label="opt.label"
-                          :value="opt.value"
-                        />
+                        <virtual-enum-options :options="getFilteredEnumOptions(meta.fieldKey, getEnumOptions(meta))" :enabled="meta.enumVirtual === undefined ? null : meta.enumVirtual" :threshold="meta.enumVirtualThreshold || 100" />
                         <el-option
                           v-if="getEnumLoadError(meta.fieldKey) && !isEnumLoading(meta.fieldKey)"
                           label="加载失败，请重新打开重试"
@@ -255,12 +250,7 @@
                         value="__all__"
                         @click.native="handleCustomSelectAll($event)"
                       />
-                      <el-option
-                        v-for="opt in getFilteredEnumOptions('__custom__', getCustomEnumOptions())"
-                        :key="opt.value"
-                        :label="opt.label"
-                        :value="opt.value"
-                      />
+                      <virtual-enum-options :options="getFilteredEnumOptions('__custom__', getCustomEnumOptions())" :enabled="getCustomEnumMeta() && getCustomEnumMeta().enumVirtual !== undefined ? getCustomEnumMeta().enumVirtual : null" :threshold="(getCustomEnumMeta() && getCustomEnumMeta().enumVirtualThreshold) || 100" />
                       <el-option
                         v-if="getEnumLoadError(customFilter.fieldKey) && !isEnumLoading(customFilter.fieldKey)"
                         label="加载失败，请重新打开重试"
@@ -430,8 +420,11 @@
 
 <script>
 import { hasActiveFilterValue, isTextOverflowing, orderEnumOptionsWithSelected } from './utils/tableUtils.mjs'
+import VirtualEnumOptions from './VirtualEnumOptions.vue'
+import { searchEnumOptions } from './utils/enumSearch.js'
 
 export default {
+  components: { VirtualEnumOptions },
   name: 'FilterPanel',
 
   props: {
@@ -735,7 +728,7 @@ export default {
       const all = this.normalizeEnumValues(enumValues)
       const q = (this.enumFilterText[fieldKey] || '').toLowerCase()
       if (!q) return orderEnumOptionsWithSelected(all, this.enumOpenSelections[fieldKey])
-      return all.filter(o => (o.label + '').toLowerCase().includes(q) || (o.value + '').toLowerCase().includes(q))
+      return searchEnumOptions(all, q)
     },
 
     handleEnumFilterInput(fieldKey, meta) {
